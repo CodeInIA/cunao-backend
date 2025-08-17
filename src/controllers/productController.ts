@@ -7,19 +7,14 @@ import { ApiResponse, PrintifyProduct } from '../types/index';
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   const printifyService = printifyServiceModule.getInstance();
   const products = await printifyService.getProducts();
-  
-  // Filtrar solo productos visibles y con frases de cuñao
-  const cunaoProducts = products.filter(product => 
-    product.visible && 
-    (product.title.toLowerCase().includes('cuñao') || 
-     product.description.toLowerCase().includes('cuñao') ||
-     product.tags.some(tag => tag.toLowerCase().includes('cuñao')))
-  );
+
+  // Filtrar solo productos visibles
+  const visibleProducts = products.filter(product => product.visible);
 
   const response: ApiResponse<PrintifyProduct[]> = {
     success: true,
-    data: cunaoProducts,
-    message: `${cunaoProducts.length} productos encontrados`
+    data: visibleProducts,
+    message: `${visibleProducts.length} productos encontrados`
   };
 
   res.status(200).json(response);
