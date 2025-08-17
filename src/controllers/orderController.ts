@@ -184,8 +184,14 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     const printifyService = printifyServiceModule.getInstance();
     const printifyOrder = await printifyService.createOrder(orderData);
     
-    // Enviar pedido a producción automáticamente
-    const productionResult = await printifyService.submitOrderToProduction(printifyOrder.id);
+    // Enviar pedido a producción automáticamente solo si está activado
+    const autoSubmit = process.env.PRINTIFY_AUTO_SUBMIT_TO_PRODUCTION === 'true';
+    let productionResult = { submitted: false };
+
+    if (autoSubmit) {
+      const result = await printifyService.submitOrderToProduction(printifyOrder.id);
+      productionResult.submitted = result;
+    }
     
     const response: ApiResponse<any> = {
       success: true,
@@ -193,9 +199,9 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
         order_id: printifyOrder.id,
         external_id: printifyOrder.external_id,
         status: printifyOrder.status,
-        sent_to_production: productionResult
+        sent_to_production: productionResult.submitted
       },
-      message: 'Pedido procesado exitosamente'
+      message: `Pedido procesado exitosamente. Envío a producción: ${autoSubmit}`
     };
 
     res.status(200).json(response);
