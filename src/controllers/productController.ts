@@ -58,6 +58,14 @@ export const getProductVariants = asyncHandler(async (req: Request, res: Respons
   res.status(200).json(response);
 });
 
+// Obtener información GPSR de un producto
+export const getProductGPSR = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const printifyService = printifyServiceModule.getInstance();
+  const gpsr = await printifyService.getProductGPSR(id);
+  res.status(200).json({ success: true, data: gpsr });
+});
+
 // Obtener productos destacados (los más populares)
 export const getFeaturedProducts = asyncHandler(async (req: Request, res: Response) => {
   const printifyService = printifyServiceModule.getInstance();

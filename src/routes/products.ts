@@ -4,7 +4,8 @@ import {
   getProduct,
   getProductVariants,
   getFeaturedProducts,
-  searchProducts
+  searchProducts,
+  getProductGPSR
 } from '../controllers/productController';
 
 const router = Router();
@@ -14,6 +15,9 @@ router.get('/', getProducts);
 router.get('/featured', getFeaturedProducts);
 router.get('/search', searchProducts);
 router.get('/:id', getProduct);
+
+// GPSR info
+router.get('/:id/gpsr', getProductGPSR);
 router.get('/:id/variants', getProductVariants);
 
 export default router;

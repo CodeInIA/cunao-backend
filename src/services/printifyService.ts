@@ -58,6 +58,17 @@ class PrintifyService {
     }
   }
 
+    // Obtener información GPSR de un producto
+  async getProductGPSR(productId: string): Promise<Array<{title: string, text: string}>> {
+    try {
+      const response = await this.api.get(`/shops/${this.shopId}/products/${productId}/gpsr.json`);
+      return response.data || [];
+    } catch (error) {
+      console.error(`Error al obtener GPSR del producto ${productId}:`, error);
+      return [];
+    }
+  }
+
   // Crear un pedido
   async createOrder(orderData: OrderRequest): Promise<PrintifyOrder> {
     try {
