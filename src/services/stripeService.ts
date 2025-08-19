@@ -66,7 +66,8 @@ class StripeService {
     items: CartItem[],
     successUrl: string,
     cancelUrl: string,
-    metadata: Record<string, string> = {}
+    metadata: Record<string, string> = {},
+    shippingRegion: string
   ): Promise<Stripe.Checkout.Session> {
     try {
       const lineItems = items.map(item => ({
@@ -85,6 +86,32 @@ class StripeService {
         quantity: item.quantity
       }));
 
+      // Calcular subtotal para comprobar si el envío es gratuito
+      const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+      const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '50');
+      const isFreeShipping = subtotal >= freeShippingThreshold;
+
+      // Definir opciones de envío basadas en la región
+      let shippingOption: any;
+      switch (shippingRegion) {
+        case 'spain':
+          shippingOption = {
+            display_name: 'España (Envío Estándar)',
+            amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_SPAIN || '5.99') * 100),
+            allowed_countries: ['ES']
+          };
+          break;
+        case 'europa':
+          shippingOption = {
+            display_name: 'Europa (UE)',
+            amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_EUROPA || '12.99') * 100),
+            allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT']
+          };
+          break;
+        default:
+          throw new Error('Región de envío no válida');
+      }
+
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: lineItems,
@@ -93,8 +120,22 @@ class StripeService {
         cancel_url: cancelUrl,
         metadata,
         shipping_address_collection: {
-          allowed_countries: ['ES', 'FR', 'DE', 'IT', 'PT', 'GB']
+          allowed_countries: shippingOption.allowed_countries,
         },
+        shipping_options: [
+          {
+            shipping_rate_data: {
+              type: 'fixed_amount',
+              fixed_amount: {
+                amount: shippingOption.amount,
+                currency: 'eur',
+              },
+              display_name: shippingOption.display_name,
+              // Opcional: especificar un tiempo de entrega estimado
+              // delivery_estimate: { ... }
+            },
+          },
+        ],
         billing_address_collection: 'required'
       });
 

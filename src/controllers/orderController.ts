@@ -2,7 +2,20 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import printifyServiceModule from '../services/printifyService';
 import stripeServiceModule from '../services/stripeService';
-import { CheckoutRequest, OrderRequest, ApiResponse } from '../types/index';
+import { CheckoutRequest, OrderRequest, ApiResponse, ShippingAddress } from '../types/index';
+
+// Función de ayuda para validar la dirección
+const validateShippingAddress = (address: ShippingAddress, region: string): boolean => {
+  switch (region) {
+    case 'spain':
+      return address.country === 'ES';
+    case 'europa':
+      // Stripe ya valida la lista de países, pero esta es una doble comprobación.
+      return address.country !== 'ES';
+    default:
+      return false;
+  }
+};
 
 // Crear Payment Intent para checkout
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
@@ -66,12 +79,19 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
 
 // Crear sesión de checkout
 export const createCheckoutSession = asyncHandler(async (req: Request, res: Response) => {
-  const { items } = req.body;
+  const { items, shippingRegion } = req.body;
   
   if (!items || !items.length) {
     return res.status(400).json({
       success: false,
       error: 'El carrito está vacío'
+    });
+  }
+
+  if (!shippingRegion) {
+    return res.status(400).json({
+      success: false,
+      error: 'La región de envío es obligatoria'
     });
   }
 
@@ -93,7 +113,8 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     cancelUrl,
     {
       items: JSON.stringify(itemsForMetadata) // Usar la versión simplificada
-    }
+    },
+    shippingRegion // Pasar la región al servicio de Stripe
   );
 
   const response: ApiResponse<any> = {
