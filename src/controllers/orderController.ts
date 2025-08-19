@@ -95,12 +95,79 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     });
   }
 
+  const printifyService = printifyServiceModule.getInstance();
+
+  // --- INICIO DE LA MODIFICACIÓN DE SEGURIDAD ---
+  // 1. Obtener solo los IDs y cantidades del cliente. No confiar en precios ni títulos.
+  const itemIdentifiers: { productId: string; variantId: number; quantity: number }[] = items.map((item: any) => ({
+    productId: item.productId,
+    variantId: item.variantId,
+    quantity: item.quantity,
+  }));
+
+  // 2. Obtener la información completa y actualizada de cada producto desde Printify.
+  const productPromises = itemIdentifiers.map(item => printifyService.getProduct(item.productId));
+  const printifyProducts = await Promise.all(productPromises);
+
+  // 3. Construir una lista de items segura con precios y datos del backend.
+  const secureItems = itemIdentifiers.map((item, index: number) => {
+    const product = printifyProducts[index];
+    if (!product) {
+      throw new Error(`Producto con ID ${item.productId} no encontrado.`);
+    }
+
+    const variant = product.variants.find(v => v.id === item.variantId);
+    if (!variant) {
+      throw new Error(`Variante con ID ${item.variantId} no encontrada para el producto ${item.productId}.`);
+    }
+    
+    const mainImage = product.images.find(img => img.is_default) || product.images[0];
+
+    // --- CORRECCIÓN DE LÓGICA Y TIPADO ---
+    // La propiedad 'options' de una variante es una lista de IDs.
+    // Debemos buscar el título de la opción en la lista de opciones del producto principal.
+    let size = '';
+    let color = '';
+
+    const sizeOptionDefinition = product.options.find(opt => opt.type === 'size');
+    if (sizeOptionDefinition) {
+      const sizeOptionValueId = variant.options.find(optId => 
+        sizeOptionDefinition.values.some(val => val.id === optId)
+      );
+      if (sizeOptionValueId) {
+        size = sizeOptionDefinition.values.find(val => val.id === sizeOptionValueId)?.title || '';
+      }
+    }
+
+    const colorOptionDefinition = product.options.find(opt => opt.type === 'color');
+    if (colorOptionDefinition) {
+      const colorOptionValueId = variant.options.find(optId => 
+        colorOptionDefinition.values.some(val => val.id === optId)
+      );
+      if (colorOptionValueId) {
+        color = colorOptionDefinition.values.find(val => val.id === colorOptionValueId)?.title || '';
+      }
+    }
+
+    return {
+      productId: product.id,
+      variantId: variant.id,
+      quantity: item.quantity,
+      title: product.title,
+      price: variant.price / 100, // El precio de Printify viene en céntimos
+      image: mainImage?.src || '',
+      size,
+      color,
+    };
+  });
+  // --- FIN DE LA MODIFICACIÓN DE SEGURIDAD ---
+
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const successUrl = `${frontendUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${frontendUrl}/cart`;
 
   // Simplificar los items para los metadatos y evitar superar el límite de 500 caracteres.
-  const itemsForMetadata = items.map((item: any) => ({
+  const itemsForMetadata = items.map((item: { productId: string; variantId: number; quantity: number }) => ({
     productId: item.productId,
     variantId: item.variantId,
     quantity: item.quantity,
@@ -108,13 +175,14 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
 
   const stripeService = stripeServiceModule.getInstance();
   const session = await stripeService.createCheckoutSession(
-    items,
+    secureItems, // <-- Usar la lista de items segura
     successUrl,
     cancelUrl,
     {
-      items: JSON.stringify(itemsForMetadata) // Usar la versión simplificada
+      items: JSON.stringify(itemsForMetadata),
+      shippingRegion: shippingRegion
     },
-    shippingRegion // Pasar la región al servicio de Stripe
+    shippingRegion
   );
 
   const response: ApiResponse<any> = {
@@ -152,7 +220,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       
       orderData = {
         external_id: session.id,
-        line_items: items.map((item: any) => ({
+        line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
           product_id: item.productId,
           variant_id: item.variantId,
           quantity: item.quantity
@@ -191,7 +259,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       
       orderData = {
         external_id: paymentIntent.id,
-        line_items: items.map((item: any) => ({
+        line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
           product_id: item.productId,
           variant_id: item.variantId,
           quantity: item.quantity
@@ -283,7 +351,7 @@ export const calculateShipping = asyncHandler(async (req: Request, res: Response
     });
   }
 
-  const line_items = items.map((item: any) => ({
+  const line_items = items.map((item: { productId: string; variantId: number; quantity: number }) => ({
     product_id: item.productId,
     variant_id: item.variantId,
     quantity: item.quantity

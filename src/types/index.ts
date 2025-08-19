@@ -6,6 +6,7 @@ export interface PrintifyProduct {
   tags: string[];
   options: ProductOption[];
   images: ProductImage[];
+  variants: PrintifyVariant[]; // <-- Añadir esta línea
   created_at: string;
   updated_at: string;
   visible: boolean;
