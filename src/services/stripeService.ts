@@ -103,7 +103,7 @@ class StripeService {
           break;
         case 'europa':
           shippingOption = {
-            display_name: 'Europa (UE)',
+            display_name: 'Resto de Europa (UE, no incluye España)',
             amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_EUROPA || '12.99') * 100),
             allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT']
           };
