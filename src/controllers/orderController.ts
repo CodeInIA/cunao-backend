@@ -79,13 +79,20 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   const successUrl = `${frontendUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${frontendUrl}/cart`;
 
+  // Simplificar los items para los metadatos y evitar superar el límite de 500 caracteres.
+  const itemsForMetadata = items.map((item: any) => ({
+    productId: item.productId,
+    variantId: item.variantId,
+    quantity: item.quantity,
+  }));
+
   const stripeService = stripeServiceModule.getInstance();
   const session = await stripeService.createCheckoutSession(
     items,
     successUrl,
     cancelUrl,
     {
-      items: JSON.stringify(items)
+      items: JSON.stringify(itemsForMetadata) // Usar la versión simplificada
     }
   );
 
