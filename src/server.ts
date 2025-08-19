@@ -10,6 +10,7 @@ import { errorHandler } from './middleware/errorHandler';
 import productRoutes from './routes/products';
 import orderRoutes from './routes/orders';
 import webhookRoutes from './routes/webhooks';
+import configRoutes from './routes/config';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -39,6 +40,9 @@ app.use(cors({
 
 // Middleware para webhooks (raw body)
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+
+// Rutas de configuración (shipping costs, threshold, etc)
+app.use('/api/config', configRoutes);
 
 // Middleware para JSON (después de webhooks)
 app.use(express.json({ limit: '10mb' }));

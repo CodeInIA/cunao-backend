@@ -88,7 +88,7 @@ class StripeService {
 
       // Calcular subtotal para comprobar si el envío es gratuito
       const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
-      const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '50');
+      const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
       const isFreeShipping = subtotal >= freeShippingThreshold;
 
       // Definir opciones de envío basadas en la región
