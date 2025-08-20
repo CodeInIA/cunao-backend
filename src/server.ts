@@ -6,11 +6,11 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 // Nota: en archivos TypeScript no añadimos la extensión .js para evitar errores ts(2307)
-import { errorHandler } from './middleware/errorHandler';
-import productRoutes from './routes/products';
-import orderRoutes from './routes/orders';
-import webhookRoutes from './routes/webhooks';
-import configRoutes from './routes/config';
+import { errorHandler } from './middleware/errorHandler.js';
+import productRoutes from './routes/products.js';
+import orderRoutes from './routes/orders.js';
+import webhookRoutes from './routes/webhooks.js';
+import configRoutes from './routes/config.js';
 
 // Cargar variables de entorno
 dotenv.config();
