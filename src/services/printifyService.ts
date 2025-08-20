@@ -2,6 +2,22 @@ import axios, { AxiosInstance } from 'axios';
 import { PrintifyProduct, PrintifyVariant, OrderRequest, PrintifyOrder, ApiResponse } from '../types/index';
 
 class PrintifyService {
+  // Marcar un producto como publicado exitosamente
+  async setPublishSucceeded(productId: string, externalId: string, handle: string): Promise<void> {
+    try {
+      const payload = {
+        external: {
+          id: externalId,
+          handle: handle,
+        },
+      };
+      await this.api.post(`/shops/${this.shopId}/products/${productId}/publishing_succeeded.json`, payload);
+      console.log(`Producto ${productId} marcado como publicado con handle: ${handle}`);
+    } catch (error: any) {
+      console.error(`Error al marcar el producto ${productId} como publicado:`, error.response?.data || error);
+      throw new Error('Error al actualizar el estado de publicación del producto');
+    }
+  }
   private api: AxiosInstance;
   private shopId: string;
 

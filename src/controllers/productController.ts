@@ -3,6 +3,38 @@ import { asyncHandler } from '../middleware/errorHandler';
 import printifyServiceModule from '../services/printifyService';
 import { ApiResponse, PrintifyProduct } from '../types/index';
 
+// Función para generar slug (debe ser idéntica a la de webhookController y frontend)
+function slugify(text: string): string {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/ñ/g, 'n') // Reemplazar ñ por n
+    .normalize('NFD') // Separar tildes de las letras
+    .replace(/[\u0300-\u036f]/g, '') // Eliminar los caracteres de tildes
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Eliminar caracteres especiales
+    .replace(/[\s_-]+/g, '-') // Reemplazar espacios y guiones bajos por un solo guion
+    .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y al final
+}
+
+// Función de ayuda para encontrar un producto por slug o ID
+async function findProductByIdentifier(identifier: string): Promise<PrintifyProduct | null> {
+  const printifyService = printifyServiceModule.getInstance();
+  
+  // 1. Intentar encontrar por slug (ineficiente pero necesario sin DB)
+  const allProducts = await printifyService.getProducts();
+  const productBySlug = allProducts.find(p => slugify(p.title) === identifier);
+
+  if (productBySlug) {
+    // Devolvemos el producto completo para tener todos los datos
+    return printifyService.getProduct(productBySlug.id);
+  }
+
+  // 2. Si no se encuentra por slug, intentar encontrar por ID como fallback
+  return printifyService.getProduct(identifier);
+}
+
 // Obtener todos los productos
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   const printifyService = printifyServiceModule.getInstance();
@@ -20,12 +52,10 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json(response);
 });
 
-// Obtener un producto específico
+// Obtener un producto específico por SLUG o ID
 export const getProduct = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  
-  const printifyService = printifyServiceModule.getInstance();
-  const product = await printifyService.getProduct(id);
+  const { id: identifier } = req.params;
+  const product = await findProductByIdentifier(identifier);
   
   if (!product) {
     return res.status(404).json({
@@ -42,12 +72,17 @@ export const getProduct = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json(response);
 });
 
-// Obtener variantes de un producto
+// Obtener variantes de un producto por SLUG o ID
 export const getProductVariants = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id: identifier } = req.params;
+  const product = await findProductByIdentifier(identifier);
+
+  if (!product) {
+    return res.status(404).json({ success: false, error: 'Producto no encontrado' });
+  }
   
   const printifyService = printifyServiceModule.getInstance();
-  const variants = await printifyService.getProductVariants(id);
+  const variants = await printifyService.getProductVariants(product.id);
   
   const response = {
     success: true,
@@ -58,11 +93,18 @@ export const getProductVariants = asyncHandler(async (req: Request, res: Respons
   res.status(200).json(response);
 });
 
-// Obtener información GPSR de un producto
+// Obtener información GPSR de un producto por SLUG o ID
 export const getProductGPSR = asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id: identifier } = req.params;
+  const product = await findProductByIdentifier(identifier);
+
+  if (!product) {
+    // Printify devuelve un array vacío si no encuentra GPSR, imitamos ese comportamiento
+    return res.status(200).json({ success: true, data: [] });
+  }
+
   const printifyService = printifyServiceModule.getInstance();
-  const gpsr = await printifyService.getProductGPSR(id);
+  const gpsr = await printifyService.getProductGPSR(product.id);
   res.status(200).json({ success: true, data: gpsr });
 });
 

@@ -1,7 +1,35 @@
+import crypto from 'crypto';
+import { PrintifyProduct } from '../types';
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import stripeServiceModule from '../services/stripeService';
 import printifyServiceModule from '../services/printifyService';
+
+// Función para generar slug a partir del título (debe ser idéntica a la de productController y frontend)
+function slugify(text: string): string {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/ñ/g, 'n') // Reemplazar ñ por n
+    .normalize('NFD') // Separar tildes de las letras
+    .replace(/[\u0300-\u036f]/g, '') // Eliminar los caracteres de tildes
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Eliminar caracteres especiales
+    .replace(/[\s_-]+/g, '-') // Reemplazar espacios y guiones bajos por un solo guion
+    .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y al final
+}
+
+// Validar la firma del webhook de Printify
+function validatePrintifySignature(req: Request): boolean {
+  const signature = req.headers['x-pfy-signature'];
+  const secret = process.env.PRINTIFY_WEBHOOK_SECRET;
+  if (!signature || !secret) return false;
+  const body = JSON.stringify(req.body);
+  const hash = crypto.createHmac('sha256', secret).update(body).digest('hex');
+  const expected = `sha256=${hash}`;
+  return crypto.timingSafeEqual(Buffer.from(signature as string), Buffer.from(expected));
+}
 
 // Webhook de Stripe para manejar eventos de pago
 export const handleStripeWebhook = asyncHandler(async (req: Request, res: Response) => {
@@ -94,38 +122,51 @@ async function handlePaymentFailed(paymentIntent: any) {
 
 // Webhook de Printify para actualizaciones de pedidos
 export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Response) => {
+  if (!validatePrintifySignature(req)) {
+    return res.status(401).json({ error: 'Firma inválida' });
+  }
+
   const event = req.body;
-  
   console.log('Evento de Printify recibido:', event.type);
-  
+
   try {
     switch (event.type) {
+      case 'product:publish:started': {
+        const productId = event.resource?.id;
+        if (!productId) break;
+        // Obtener el producto para el título
+        const printifyService = printifyServiceModule.getInstance();
+        const product: PrintifyProduct | null = await printifyService.getProduct(productId);
+        if (!product) break;
+        const slug = slugify(product.title);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const handle = `${frontendUrl}/producto/${slug}`;
+        const externalId = productId;
+        // Marcar como publicado en Printify
+        await printifyService.setPublishSucceeded(productId, externalId, handle);
+        console.log(`Producto ${productId} marcado como publicado automáticamente desde webhook: ${handle}`);
+        break;
+      }
+      // ...otros eventos de Printify...
       case 'order:created':
         await handleOrderCreated(event.resource);
         break;
-        
       case 'order:updated':
         await handleOrderUpdated(event.resource);
         break;
-        
       case 'order:sent-to-production':
         await handleOrderSentToProduction(event.resource);
         break;
-        
       case 'order:shipment:created':
         await handleShipmentCreated(event.resource);
         break;
-        
       case 'order:shipment:delivered':
         await handleShipmentDelivered(event.resource);
         break;
-        
       default:
         console.log(`Evento de Printify no manejado: ${event.type}`);
     }
-
     res.status(200).json({ received: true });
-    
   } catch (error: any) {
     console.error('Error al procesar webhook de Printify:', error);
     res.status(400).json({
