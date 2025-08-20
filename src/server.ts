@@ -73,6 +73,8 @@ app.all('*', (req, res) => {
   });
 });
 
+app.set('trust proxy', 1); // Heroku usa un proxy
+
 app.listen(PORT, () => {
   console.log(`🚀 Servidor de Cuñadismo Ilustrado ejecutándose en puerto ${PORT}`);
   console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
