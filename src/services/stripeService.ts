@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { CartItem, ShippingAddress, StripePaymentIntent } from '../types/index';
+import { CartItem, ShippingAddress, StripePaymentIntent } from '../types/index.js';
 
 class StripeService {
   private stripe: Stripe;

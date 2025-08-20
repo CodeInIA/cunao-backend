@@ -5,7 +5,7 @@ import {
   processOrder,
   getOrderStatus,
   calculateShipping
-} from '../controllers/orderController';
+} from '../controllers/orderController.js';
 
 const router = Router();
 

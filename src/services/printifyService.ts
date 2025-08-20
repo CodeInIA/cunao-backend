@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { PrintifyProduct, PrintifyVariant, OrderRequest, PrintifyOrder, ApiResponse } from '../types/index';
+import { PrintifyProduct, PrintifyVariant, OrderRequest, PrintifyOrder} from '../types/index.js';
 
 class PrintifyService {
   // Marcar un producto como publicado exitosamente

@@ -1,5 +1,5 @@
 import express from 'express';
-import { getShippingConfig } from '../controllers/configController';
+import { getShippingConfig } from '../controllers/configController.js';
 
 const router = express.Router();
 

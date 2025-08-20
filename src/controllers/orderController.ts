@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '../middleware/errorHandler';
-import printifyServiceModule from '../services/printifyService';
-import stripeServiceModule from '../services/stripeService';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import printifyServiceModule from '../services/printifyService.js';
+import stripeServiceModule from '../services/stripeService.js';
 import { CheckoutRequest, OrderRequest, ApiResponse, ShippingAddress } from '../types/index';
 
 // Función de ayuda para validar la dirección

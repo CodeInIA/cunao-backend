@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler';
 import printifyServiceModule from '../services/printifyService';
-import { ApiResponse, PrintifyProduct } from '../types/index';
+import { ApiResponse, PrintifyProduct } from '../types/index.js';
 
 // Función para generar slug (debe ser idéntica a la de webhookController y frontend)
 function slugify(text: string): string {

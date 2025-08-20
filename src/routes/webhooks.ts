@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   handleStripeWebhook,
   handlePrintifyWebhook
-} from '../controllers/webhookController';
+} from '../controllers/webhookController.js';
 
 const router = Router();
 

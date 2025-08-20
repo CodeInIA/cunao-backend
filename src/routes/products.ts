@@ -6,7 +6,7 @@ import {
   getFeaturedProducts,
   searchProducts,
   getProductGPSR
-} from '../controllers/productController';
+} from '../controllers/productController.js';
 
 const router = Router();
 

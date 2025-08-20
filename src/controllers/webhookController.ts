@@ -1,9 +1,9 @@
 import crypto from 'crypto';
-import { PrintifyProduct } from '../types';
+import { PrintifyProduct } from '../types/index.js';
 import { Request, Response } from 'express';
-import { asyncHandler } from '../middleware/errorHandler';
-import stripeServiceModule from '../services/stripeService';
-import printifyServiceModule from '../services/printifyService';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import stripeServiceModule from '../services/stripeService.js';
+import printifyServiceModule from '../services/printifyService.js';
 
 // Función para generar slug a partir del título (debe ser idéntica a la de productController y frontend)
 function slugify(text: string): string {
