@@ -66,10 +66,10 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 // Manejador para rutas no encontradas
-app.use('*', (req, res) => {
+app.all('*', (req, res) => {
   res.status(404).json({
     error: 'Ruta no encontrada',
-    message: 'La ruta solicitada no existe en esta API'
+    message: `No se puede encontrar ${req.originalUrl} en este servidor.`
   });
 });
 
