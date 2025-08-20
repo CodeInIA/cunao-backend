@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '../middleware/errorHandler';
-import printifyServiceModule from '../services/printifyService';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import printifyServiceModule from '../services/printifyService.js';
 import { ApiResponse, PrintifyProduct } from '../types/index.js';
 
 // Función para generar slug (debe ser idéntica a la de webhookController y frontend)
