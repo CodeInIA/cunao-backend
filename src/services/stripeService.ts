@@ -68,35 +68,17 @@ class StripeService {
 
   // Crear sesión de checkout
   async createCheckoutSession(
-    items: CartItem[],
+    lineItems: Stripe.Checkout.SessionCreateParams.LineItem[],
     successUrl: string,
     cancelUrl: string,
     metadata: Record<string, string> = {},
     shippingRegion: string
   ): Promise<Stripe.Checkout.Session> {
     try {
-      const lineItems = items.map(item => ({
-        price_data: {
-          currency: 'eur',
-          product_data: {
-            name: item.title,
-            images: [item.image],
-            metadata: {
-              product_id: item.productId,
-              variant_id: item.variantId.toString()
-            }
-          },
-          unit_amount: Math.round(item.price * 100)
-        },
-        quantity: item.quantity
-      }));
-
-      // Calcular subtotal para comprobar si el envío es gratuito
-      const subtotal = items.reduce((total, item) => total + item.price * item.quantity, 0);
+      const subtotal = metadata.items ? JSON.parse(metadata.items).reduce((total: number, item: CartItem) => total + item.price * item.quantity, 0) : 0;
       const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
       const isFreeShipping = subtotal >= freeShippingThreshold;
 
-      // Definir opciones de envío basadas en la región
       let shippingOption: any;
       switch (shippingRegion) {
         case 'spain':
@@ -108,9 +90,9 @@ class StripeService {
           break;
         case 'europa':
           shippingOption = {
-            display_name: 'Resto de Europa (UE, no incluye España)',
+            display_name: 'Resto de Europa (UE)',
             amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_EUROPA || '12.99') * 100),
-            allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT']
+            allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT'] // Ejemplo
           };
           break;
         default:
@@ -119,7 +101,7 @@ class StripeService {
 
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
-        line_items: lineItems,
+        line_items: lineItems, // <-- Simplemente usamos el array que nos llega
         mode: 'payment',
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -139,8 +121,6 @@ class StripeService {
                 currency: 'eur',
               },
               display_name: shippingOption.display_name,
-              // Opcional: especificar un tiempo de entrega estimado
-              // delivery_estimate: { ... }
             },
           },
         ],

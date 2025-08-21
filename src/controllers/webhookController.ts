@@ -106,13 +106,19 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
 // Stripe
 async function handleCheckoutCompleted(session: any) {
   console.log('Checkout completado:', session.id);
-  
+
+  // --- INICIO DE LA MEJOR PRÁCTICA ---
+  // Ahora los metadatos contienen toda la información que necesitamos.
+  // Simplemente la parseamos y la guardamos directamente.
+  const lineItems = JSON.parse(session.metadata?.items || '[]');
+  // --- FIN DE LA MEJOR PRÁCTICA ---
+
   await db.saveOrder({
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
     customerName: session.customer_details.name,
     totalAmount: session.amount_total / 100,
-    lineItems: JSON.parse(session.metadata?.items || '[]'),
+    lineItems: lineItems, // <-- Guardamos la lista completa y detallada
     shippingDetails: {
       address: session.customer_details.address?.line1 || '',
       city: session.customer_details.address?.city || '',
@@ -123,6 +129,7 @@ async function handleCheckoutCompleted(session: any) {
     status: 'pending'
   });
 
+  // El envío de email ahora también tendrá la información completa
   await notificationService.sendOrderConfirmationEmail(session);
 }
 

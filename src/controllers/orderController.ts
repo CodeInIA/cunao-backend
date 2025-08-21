@@ -2,8 +2,17 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import printifyServiceModule from '../services/printifyService.js';
 import stripeServiceModule from '../services/stripeService.js';
-import { db } from '../services/databaseService.js'; // CAMBIO: Importamos la base de datos
-import { CheckoutRequest, OrderRequest, ApiResponse, ShippingAddress } from '../types/index';
+import { db } from '../services/databaseService.js';
+import { 
+  CheckoutRequest, 
+  OrderRequest, 
+  ApiResponse, 
+  ShippingAddress,
+  CartItem,
+  PrintifyVariant,
+  ProductImage,
+  ProductOption,
+  OptionValue } from '../types/index.js';
 
 // Función de ayuda para validar la dirección
 const validateShippingAddress = (address: ShippingAddress, region: string): boolean => {
@@ -83,118 +92,96 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   const { items, shippingRegion } = req.body;
   
   if (!items || !items.length) {
-    return res.status(400).json({
-      success: false,
-      error: 'El carrito está vacío'
-    });
+    return res.status(400).json({ success: false, error: 'El carrito está vacío' });
   }
-
   if (!shippingRegion) {
-    return res.status(400).json({
-      success: false,
-      error: 'La región de envío es obligatoria'
-    });
+    return res.status(400).json({ success: false, error: 'La región de envío es obligatoria' });
   }
 
   const printifyService = printifyServiceModule.getInstance();
-
-  // --- INICIO DE LA MODIFICACIÓN DE SEGURIDAD ---
-  // 1. Obtener solo los IDs y cantidades del cliente. No confiar en precios ni títulos.
-  const itemIdentifiers: { productId: string; variantId: number; quantity: number }[] = items.map((item: any) => ({
-    productId: item.productId,
-    variantId: item.variantId,
-    quantity: item.quantity,
-  }));
-
-  // 2. Obtener la información completa y actualizada de cada producto desde Printify.
-  const productPromises = itemIdentifiers.map(item => printifyService.getProduct(item.productId));
+  const productPromises = items.map((item: CartItem) => printifyService.getProduct(item.productId));
   const printifyProducts = await Promise.all(productPromises);
 
-  // 3. Construir una lista de items segura con precios y datos del backend.
-  const secureItems = itemIdentifiers.map((item, index: number) => {
+  const secureItems = items.map((item: CartItem, index: number) => {
     const product = printifyProducts[index];
-    if (!product) {
-      throw new Error(`Producto con ID ${item.productId} no encontrado.`);
-    }
-
-    const variant = product.variants.find(v => v.id === item.variantId);
-    if (!variant) {
-      throw new Error(`Variante con ID ${item.variantId} no encontrada para el producto ${item.productId}.`);
-    }
+    if (!product) throw new Error(`Producto con ID ${item.productId} no encontrado.`);
     
-    const mainImage = product.images.find(img => img.is_default) || product.images[0];
-
-    // --- CORRECCIÓN DE LÓGICA Y TIPADO ---
-    // La propiedad 'options' de una variante es una lista de IDs.
-    // Debemos buscar el título de la opción en la lista de opciones del producto principal.
-    let size = '';
-    let color = '';
-
-    const sizeOptionDefinition = product.options.find(opt => opt.type === 'size');
-    if (sizeOptionDefinition) {
-      const sizeOptionValueId = variant.options.find(optId => 
-        sizeOptionDefinition.values.some(val => val.id === optId)
-      );
-      if (sizeOptionValueId) {
-        size = sizeOptionDefinition.values.find(val => val.id === sizeOptionValueId)?.title || '';
-      }
+    const variant = product.variants.find((v: PrintifyVariant) => v.id === item.variantId);
+    
+    // --- INICIO DE LA CORRECIÓN ---
+    // Añadimos una comprobación de seguridad para la variante y su ID
+    if (!variant || typeof variant.id === 'undefined') {
+      throw new Error(`Variante con ID ${item.variantId} no válida o sin ID para el producto ${item.productId}.`);
     }
-
-    const colorOptionDefinition = product.options.find(opt => opt.type === 'color');
-    if (colorOptionDefinition) {
-      const colorOptionValueId = variant.options.find(optId => 
-        colorOptionDefinition.values.some(val => val.id === optId)
-      );
-      if (colorOptionValueId) {
-        color = colorOptionDefinition.values.find(val => val.id === colorOptionValueId)?.title || '';
-      }
-    }
+    // --- FIN DE LA CORRECIÓN ---
+    
+    const mainImage = product.images.find((img: ProductImage) => img.is_default) || product.images[0];
+    const sizeOption = product.options.find((opt: ProductOption) => opt.type === 'size');
+    const colorOption = product.options.find((opt: ProductOption) => opt.type === 'color');
+    const size = sizeOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
+    const color = colorOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
 
     return {
       productId: product.id,
       variantId: variant.id,
       quantity: item.quantity,
       title: product.title,
-      price: variant.price / 100, // El precio de Printify viene en céntimos
+      price: variant.price / 100,
       image: mainImage?.src || '',
       size,
       color,
     };
   });
-  // --- FIN DE LA MODIFICACIÓN DE SEGURIDAD ---
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const successUrl = `${frontendUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${frontendUrl}/cart`;
 
-  // Simplificar los items para los metadatos y evitar superar el límite de 500 caracteres.
-  const itemsForMetadata = items.map((item: { productId: string; variantId: number; quantity: number }) => ({
-    productId: item.productId,
-    variantId: item.variantId,
-    quantity: item.quantity,
+  const lineItemsForStripe = secureItems.map((item: {
+    productId: string;
+    variantId: number;
+    quantity: number;
+    title: string;
+    price: number;
+    image: string;
+    size: string;
+    color: string;
+  }) => ({
+    price_data: {
+      currency: 'eur',
+      product_data: {
+        name: item.title,
+        images: [item.image],
+        metadata: {
+          productId: item.productId,
+          variantId: item.variantId.toString(),
+          size: item.size,
+          color: item.color
+        }
+      },
+      unit_amount: Math.round(item.price * 100)
+    },
+    quantity: item.quantity
   }));
+  
+  const metadataForSession = {
+    items: JSON.stringify(secureItems),
+    shippingRegion: shippingRegion
+  };
 
   const stripeService = stripeServiceModule.getInstance();
   const session = await stripeService.createCheckoutSession(
-    secureItems, // <-- Usar la lista de items segura
+    lineItemsForStripe,
     successUrl,
     cancelUrl,
-    {
-      items: JSON.stringify(itemsForMetadata),
-      shippingRegion: shippingRegion
-    },
+    metadataForSession,
     shippingRegion
   );
 
-  const response: ApiResponse<any> = {
+  res.status(200).json({
     success: true,
-    data: {
-      checkout_url: session.url,
-      session_id: session.id
-    }
-  };
-
-  res.status(200).json(response);
+    data: { checkout_url: session.url, session_id: session.id }
+  });
 });
 
 // Procesar pedido después del pago exitoso

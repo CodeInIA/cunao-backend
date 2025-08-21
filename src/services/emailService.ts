@@ -4,9 +4,6 @@ import nodemailer from 'nodemailer';
 
 dotenv.config();
 
-console.log('ZOHO_EMAIL_USER:', process.env.ZOHO_EMAIL_USER);
-console.log('ZOHO_APP_PASSWORD:', process.env.ZOHO_APP_PASSWORD);
-
 // 1. Configuración del "Transportador" (quién envía el correo)
 const transporter = nodemailer.createTransport({
   host: 'smtp.zoho.eu', // Servidor de envío de Zoho para Europa
