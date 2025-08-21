@@ -127,7 +127,8 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
     return res.status(401).json({ error: 'Firma inválida' });
   }
 
-  const event = req.body;
+  // Parsear el buffer si es necesario
+  const event = req.body instanceof Buffer ? JSON.parse(req.body.toString('utf8')) : req.body;
   console.log('Evento de Printify recibido:', event.type);
 
   try {
