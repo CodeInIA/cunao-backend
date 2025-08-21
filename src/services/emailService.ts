@@ -1,6 +1,11 @@
-// src/services/emailService.ts
+import dotenv from 'dotenv';
 
 import nodemailer from 'nodemailer';
+
+dotenv.config();
+
+console.log('ZOHO_EMAIL_USER:', process.env.ZOHO_EMAIL_USER);
+console.log('ZOHO_APP_PASSWORD:', process.env.ZOHO_APP_PASSWORD);
 
 // 1. Configuración del "Transportador" (quién envía el correo)
 const transporter = nodemailer.createTransport({
@@ -8,9 +13,16 @@ const transporter = nodemailer.createTransport({
   port: 465,
   secure: true, // true para el puerto 465, false para otros
   auth: {
-    user: process.env.ZOHO_EMAIL_USER, // Tu correo, ej: noreply@cunadismoilustrado.me
+    user: process.env.ZOHO_EMAIL_USER, // Tu correo, ej: info@cunadismoilustrado.me
     pass: process.env.ZOHO_APP_PASSWORD, // La contraseña de aplicación que generaste
   },
+  // --- INICIO DE LA CORRECCIÓN DEFINITIVA ---
+  // Forzamos a Node.js a ignorar la validación de certificados
+  // SOLO si no estamos en un entorno de producción.
+  tls: {
+    rejectUnauthorized: process.env.NODE_ENV === 'production' 
+  }
+  // --- FIN DE LA CORRECCIÓN DEFINITIVA ---
 });
 
 // Interfaz para las opciones del email
@@ -23,8 +35,11 @@ interface MailOptions {
 // 2. Función para enviar el email
 export const sendEmail = async ({ to, subject, html }: MailOptions) => {
   try {
+    // Añadimos un log para verificar el entorno
+    console.log(`Intentando enviar email en entorno: ${process.env.NODE_ENV || 'development'}`);
+    
     const info = await transporter.sendMail({
-      from: `"Cuñadismo Ilustrado" <${process.env.ZOHO_EMAIL_USER}>`, // Remitente
+      from: `"Cuñadismo Ilustrado" <noreply@cunadismoilustrado.me>`, // Usamos el alias noreply
       to: to, // Destinatario
       subject: subject, // Asunto
       html: html, // Cuerpo del email en HTML

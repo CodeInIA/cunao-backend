@@ -5,7 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
-// Nota: en archivos TypeScript no añadimos la extensión .js para evitar errores ts(2307)
+
 import { errorHandler } from './middleware/errorHandler.js';
 import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
@@ -13,27 +13,23 @@ import webhookRoutes from './routes/webhooks.js';
 import configRoutes from './routes/config.js';
 import { db } from './services/databaseService.js';
 
-// Cargar variables de entorno
 dotenv.config();
 
-db.connect(); // Conectar a la base de datos
+db.connect();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Rate limiting
+// --- Middlewares de seguridad y rendimiento (se aplican a todo) ---
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Máximo 100 requests por ventana de tiempo por IP
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Demasiadas peticiones desde esta IP, intenta de nuevo más tarde.'
 });
-
-// Middleware de seguridad
 app.use(helmet());
 app.use(compression());
 app.use(limiter);
 
-// CORS
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'];
 app.use(cors({
   origin: allowedOrigins,
@@ -41,20 +37,24 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Middleware para webhooks (raw body)
-app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+// --- INICIO DE LA CORRECCIÓN ---
 
-// Rutas de configuración (shipping costs, threshold, etc)
-app.use('/api/config', configRoutes);
+// 1. Ruta de Webhooks PRIMERO.
+//    Stripe y Printify necesitan el 'raw body'. Usamos express.raw() solo para esta ruta
+//    y le pasamos directamente el router de webhooks para que se encargue.
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 
-// Middleware para JSON (después de webhooks)
+// 2. Middleware para parsear JSON DESPUÉS.
+//    Esto se aplicará a todas las demás rutas que sí necesitan un body en formato JSON.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rutas
+// --- FIN DE LA CORRECCIÓN ---
+
+// Resto de las rutas que SÍ usan el parser de JSON
+app.use('/api/config', configRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/webhooks', webhookRoutes);
 
 // Ruta de salud
 app.get('/health', (req, res) => {
@@ -65,10 +65,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Middleware de manejo de errores
+// Middlewares finales de manejo de errores y 404
 app.use(errorHandler);
-
-// Manejador para rutas no encontradas
 app.all('*', (req, res) => {
   res.status(404).json({
     error: 'Ruta no encontrada',
@@ -76,7 +74,7 @@ app.all('*', (req, res) => {
   });
 });
 
-app.set('trust proxy', 1); // Heroku usa un proxy
+app.set('trust proxy', 1);
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor de Cuñadismo Ilustrado ejecutándose en puerto ${PORT}`);

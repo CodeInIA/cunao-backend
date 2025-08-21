@@ -48,7 +48,7 @@ export const handleStripeWebhook = asyncHandler(async (req: Request, res: Respon
 
   try {
     const stripeService = stripeServiceModule.getInstance();
-    const event = stripeService.verifyWebhookSignature((req as any).rawBody, signature);
+    const event = stripeService.verifyWebhookSignature(req.body, signature);
     
     console.log('Evento de Stripe recibido:', event.type);
     
