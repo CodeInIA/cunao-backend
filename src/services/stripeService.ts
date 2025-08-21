@@ -54,6 +54,11 @@ class StripeService {
     }
   }
 
+    // Obtener los productos de una sesión de checkout
+  async getCheckoutSessionLineItems(sessionId: string) {
+    return this.stripe.checkout.sessions.listLineItems(sessionId);
+  }
+
   // Calcular total del carrito
   calculateCartTotal(items: CartItem[]): number {
     return items.reduce((total, item) => {

@@ -1,163 +1,90 @@
 import crypto from 'crypto';
-import { PrintifyProduct } from '../types/index.js';
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import stripeServiceModule from '../services/stripeService.js';
 import printifyServiceModule from '../services/printifyService.js';
+import * as notificationService from '../services/notificationService.js';
+import { db } from '../services/databaseService.js'; // Asegúrate de que esta ruta sea correcta
+import { PrintifyProduct } from '../types/index.js';
 
-// Función para generar slug a partir del título (debe ser idéntica a la de productController y frontend)
+// --- Función slugify ---
 function slugify(text: string): string {
-  if (!text) return '';
-  return text
-    .toString()
-    .toLowerCase()
-    .replace(/ñ/g, 'n') // Reemplazar ñ por n
-    .normalize('NFD') // Separar tildes de las letras
-    .replace(/[\u0300-\u036f]/g, '') // Eliminar los caracteres de tildes
-    .trim()
-    .replace(/[^\w\s-]/g, '') // Eliminar caracteres especiales
-    .replace(/[\s_-]+/g, '-') // Reemplazar espacios y guiones bajos por un solo guion
-    .replace(/^-+|-+$/g, ''); // Eliminar guiones al inicio y al final
+    if (!text) return '';
+    return text.toString().toLowerCase().replace(/ñ/g, 'n').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
-// Validar la firma del webhook de Printify
+// --- Validación de Firma de Printify ---
 function validatePrintifySignature(req: Request): boolean {
-  const signature = req.headers['x-pfy-signature'];
+  const signature = req.headers['x-pfy-signature'] as string;
   const secret = process.env.PRINTIFY_WEBHOOK_SECRET;
-  if (!signature || !secret) return false;
-  // Usar el buffer directamente
-  const body = req.body instanceof Buffer ? req.body : Buffer.from(JSON.stringify(req.body));
+  
+  if (!signature || !secret) {
+    console.error('Falta la firma o el secreto para el webhook de Printify.');
+    return false;
+  }
+  
+  const body = (req as any).rawBody;
+  if (!body) {
+      console.error('El cuerpo de la petición (rawBody) no está disponible para la validación.');
+      return false;
+  }
+
   const hash = crypto.createHmac('sha256', secret).update(body).digest('hex');
-  const expected = `sha256=${hash}`;
-  return crypto.timingSafeEqual(Buffer.from(signature as string), Buffer.from(expected));
+  const expectedSignature = `sha256=${hash}`;
+  
+  try {
+      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  } catch {
+      return false;
+  }
 }
 
-// Webhook de Stripe para manejar eventos de pago
+// --- Webhook de Stripe ---
 export const handleStripeWebhook = asyncHandler(async (req: Request, res: Response) => {
   const signature = req.headers['stripe-signature'] as string;
-  
   if (!signature) {
-    return res.status(400).json({
-      success: false,
-      error: 'Falta la firma del webhook'
-    });
+    return res.status(400).json({ error: 'Falta la firma del webhook' });
   }
 
   try {
     const stripeService = stripeServiceModule.getInstance();
-    const event = stripeService.verifyWebhookSignature(req.body, signature);
+    const event = stripeService.verifyWebhookSignature((req as any).rawBody, signature);
     
     console.log('Evento de Stripe recibido:', event.type);
+    
+    // Responde inmediatamente a Stripe
+    res.status(200).json({ received: true });
 
+    // Procesa el evento en segundo plano
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(event.data.object);
         break;
-        
-      case 'payment_intent.succeeded':
-        await handlePaymentSucceeded(event.data.object);
-        break;
-        
-      case 'payment_intent.payment_failed':
-        await handlePaymentFailed(event.data.object);
-        break;
-        
+      // Puedes añadir más casos si los necesitas
       default:
-        console.log(`Evento no manejado: ${event.type}`);
+        console.log(`Evento de Stripe no manejado: ${event.type}`);
     }
-
-    res.status(200).json({ received: true });
-    
   } catch (error: any) {
     console.error('Error al procesar webhook de Stripe:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Error al verificar webhook: ' + error.message
-    });
+    // No envíes una respuesta de error aquí, porque ya has enviado el 200 OK
   }
 });
 
-// Manejar checkout completado
-async function handleCheckoutCompleted(session: any) {
-  console.log('Checkout completado:', session.id);
-  
-  try {
-    // Aquí podrías implementar lógica adicional como:
-    // - Enviar email de confirmación
-    // - Actualizar inventario
-    // - Notificaciones automáticas
-    
-    // El procesamiento del pedido se hace desde el frontend
-    // cuando el usuario es redirigido a la página de éxito
-    
-  } catch (error) {
-    console.error('Error al procesar checkout completado:', error);
-  }
-}
-
-// Manejar pago exitoso
-async function handlePaymentSucceeded(paymentIntent: any) {
-  console.log('Pago exitoso:', paymentIntent.id);
-  
-  try {
-    // Lógica adicional para pagos exitosos
-    // Por ejemplo, enviar notificación al equipo
-    
-  } catch (error) {
-    console.error('Error al procesar pago exitoso:', error);
-  }
-}
-
-// Manejar pago fallido
-async function handlePaymentFailed(paymentIntent: any) {
-  console.log('Pago fallido:', paymentIntent.id);
-  
-  try {
-    // Lógica para manejar pagos fallidos
-    // Por ejemplo, notificar al customer service
-    
-  } catch (error) {
-    console.error('Error al procesar pago fallido:', error);
-  }
-}
-
-// Webhook de Printify para actualizaciones de pedidos
+// --- Webhook de Printify ---
 export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Response) => {
   if (!validatePrintifySignature(req)) {
     return res.status(401).json({ error: 'Firma inválida' });
   }
 
-  // Parsear el buffer si es necesario
-  const event = req.body instanceof Buffer ? JSON.parse(req.body.toString('utf8')) : req.body;
-  console.log('Evento de Printify recibido:', event.type);
+  res.status(200).json({ received: true });
+
+  const event = JSON.parse((req as any).rawBody.toString('utf8'));
+  console.log('Evento de Printify recibido y aceptado, procesando:', event.type);
 
   try {
     switch (event.type) {
-      case 'product:publish:started': {
-        const productId = event.resource?.id;
-        if (!productId) break;
-        // Obtener el producto para el título
-        const printifyService = printifyServiceModule.getInstance();
-        const product: PrintifyProduct | null = await printifyService.getProduct(productId);
-        if (!product) break;
-        const slug = slugify(product.title);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const handle = `${frontendUrl}/producto/${slug}`;
-        const externalId = productId;
-        // Marcar como publicado en Printify
-        await printifyService.setPublishSucceeded(productId, externalId, handle);
-        console.log(`Producto ${productId} marcado como publicado automáticamente desde webhook: ${handle}`);
-        break;
-      }
-      // ...otros eventos de Printify...
-      case 'order:created':
-        await handleOrderCreated(event.resource);
-        break;
-      case 'order:updated':
-        await handleOrderUpdated(event.resource);
-        break;
-      case 'order:sent-to-production':
-        await handleOrderSentToProduction(event.resource);
+      case 'product:publish:started':
+        await handleProductPublishStarted(event.resource);
         break;
       case 'order:shipment:created':
         await handleShipmentCreated(event.resource);
@@ -168,51 +95,88 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
       default:
         console.log(`Evento de Printify no manejado: ${event.type}`);
     }
-    res.status(200).json({ received: true });
   } catch (error: any) {
-    console.error('Error al procesar webhook de Printify:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Error al procesar webhook: ' + error.message
-    });
+    console.error(`Error procesando el evento '${event.type}' en segundo plano:`, error);
   }
 });
 
-// Manejar creación de pedido
-async function handleOrderCreated(order: any) {
-  console.log('Pedido creado en Printify:', order.id);
+
+// --- Lógica de Negocio (Helpers) ---
+
+// Stripe
+async function handleCheckoutCompleted(session: any) {
+  console.log('Checkout completado:', session.id);
   
-  // Aquí podrías implementar:
-  // - Guardar en base de datos local
-  // - Enviar confirmación por email
-  // - Notificar al equipo
+  await db.saveOrder({
+    stripeSessionId: session.id,
+    customerEmail: session.customer_details.email,
+    customerName: session.customer_details.name, // Ya guardamos el nombre completo aquí
+    totalAmount: session.amount_total / 100,
+    lineItems: JSON.parse(session.metadata?.items || '[]'),
+    shippingDetails: {
+      address: session.customer_details.address?.line1 || '',
+      city: session.customer_details.address?.city || '',
+      postalCode: session.customer_details.address?.postal_code || '',
+      country: session.customer_details.address?.country || '',
+    },
+    status: 'pending'
+  });
+
+  // La función de notificación ya coge el nombre de la sesión
+  await notificationService.sendOrderConfirmationEmail(session);
 }
 
-// Manejar actualización de pedido
-async function handleOrderUpdated(order: any) {
-  console.log('Pedido actualizado en Printify:', order.id);
-  
-  // Actualizar estado local del pedido
+// Printify
+async function handleProductPublishStarted(resource: any) {
+    const productId = resource?.id;
+    if (!productId) return;
+
+    const printifyService = printifyServiceModule.getInstance();
+    const product: PrintifyProduct | null = await printifyService.getProduct(productId);
+    if (!product) return;
+
+    const slug = slugify(product.title);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const handle = `${frontendUrl}/producto/${slug}`;
+
+    await printifyService.setPublishSucceeded(productId, productId, handle);
+    console.log(`Producto ${productId} marcado como publicado: ${handle}`);
 }
 
-// Manejar envío a producción
-async function handleOrderSentToProduction(order: any) {
-  console.log('Pedido enviado a producción:', order.id);
+async function handleShipmentCreated(resource: any) {
+  const printifyOrderId = resource.id;
+  console.log('Envío creado para el pedido de Printify:', printifyOrderId);
   
-  // Notificar al cliente que su pedido está en producción
+  const orderInDb = await db.findOrderByPrintifyId(printifyOrderId);
+
+  if (orderInDb && orderInDb.customerEmail && orderInDb.customerName) {
+    await db.updateOrderByPrintifyId(printifyOrderId, {
+      status: 'shipped',
+      trackingNumber: resource.data.carrier.tracking_number,
+      trackingUrl: resource.data.carrier.tracking_url
+    });
+    // CAMBIO: Pasamos el nombre del cliente a la función de notificación
+    const firstName = orderInDb.customerName.split(' ')[0];
+    await notificationService.sendShippingConfirmationEmail(resource.data, orderInDb.customerEmail, firstName);
+  } else {
+    console.error(`No se encontró el pedido o los datos del cliente ${printifyOrderId} en la BD.`);
+  }
 }
 
-// Manejar creación de envío
-async function handleShipmentCreated(shipment: any) {
-  console.log('Envío creado:', shipment.id);
+async function handleShipmentDelivered(resource: any) {
+  const printifyOrderId = resource.id;
+  console.log('Envío entregado para el pedido de Printify:', printifyOrderId);
   
-  // Enviar información de tracking al cliente
-}
+  const orderInDb = await db.findOrderByPrintifyId(printifyOrderId);
 
-// Manejar entrega de envío
-async function handleShipmentDelivered(shipment: any) {
-  console.log('Envío entregado:', shipment.id);
-  
-  // Enviar confirmación de entrega
-  // Solicitar reseña del producto
+  if (orderInDb && orderInDb.customerEmail && orderInDb.customerName) {
+    await db.updateOrderByPrintifyId(printifyOrderId, {
+      status: 'delivered'
+    });
+    // CAMBIO: Pasamos el nombre del cliente a la función de notificación
+    const firstName = orderInDb.customerName.split(' ')[0];
+    await notificationService.sendDeliveryConfirmationEmail(resource.data, orderInDb.customerEmail, firstName);
+  } else {
+    console.error(`No se encontró el pedido o los datos del cliente ${printifyOrderId} en la BD.`);
+  }
 }

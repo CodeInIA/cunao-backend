@@ -11,9 +11,12 @@ import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
 import webhookRoutes from './routes/webhooks.js';
 import configRoutes from './routes/config.js';
+import { db } from './services/databaseService.js';
 
 // Cargar variables de entorno
 dotenv.config();
+
+db.connect(); // Conectar a la base de datos
 
 const app = express();
 const PORT = process.env.PORT || 3001;

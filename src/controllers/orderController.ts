@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import printifyServiceModule from '../services/printifyService.js';
 import stripeServiceModule from '../services/stripeService.js';
+import { db } from '../services/databaseService.js'; // CAMBIO: Importamos la base de datos
 import { CheckoutRequest, OrderRequest, ApiResponse, ShippingAddress } from '../types/index';
 
 // Función de ayuda para validar la dirección
@@ -198,118 +199,82 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
 
 // Procesar pedido después del pago exitoso
 export const processOrder = asyncHandler(async (req: Request, res: Response) => {
-  const { payment_intent_id, session_id } = req.body;
-  
+  const { session_id } = req.body;
+  if (!session_id) {
+    return res.status(400).json({ success: false, error: 'Se requiere session_id' });
+  }
+
   try {
-    let orderData: any;
+    const stripeService = stripeServiceModule.getInstance();
+    const session = await stripeService.getCheckoutSession(session_id);
     
-    if (session_id) {
-      // Obtener información de la sesión de Stripe
-      const stripeService = stripeServiceModule.getInstance();
-      const session = await stripeService.getCheckoutSession(session_id);
-      
-      if (session.payment_status !== 'paid') {
-        return res.status(400).json({
-          success: false,
-          error: 'El pago no ha sido completado'
-        });
-      }
-
-      // Extraer datos del pedido de los metadatos
-      const items = JSON.parse(session.metadata?.items || '[]');
-      
-      orderData = {
-        external_id: session.id,
-        line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
-          product_id: item.productId,
-          variant_id: item.variantId,
-          quantity: item.quantity
-        })),
-        shipping_method: 1, // Método por defecto
-        is_printify_express: false,
-        send_shipping_notification: true,
-        address_to: {
-          first_name: session.customer_details?.name?.split(' ')[0] || '',
-          last_name: session.customer_details?.name?.split(' ').slice(1).join(' ') || '',
-          email: session.customer_details?.email || '',
-          phone: session.customer_details?.phone || '',
-          country: session.customer_details?.address?.country || 'ES',
-          region: session.customer_details?.address?.state || '',
-          address1: session.customer_details?.address?.line1 || '',
-          address2: session.customer_details?.address?.line2 || '',
-          city: session.customer_details?.address?.city || '',
-          zip: session.customer_details?.address?.postal_code || ''
-        }
-      };
-    } else if (payment_intent_id) {
-      // Verificar el Payment Intent
-      const stripeService = stripeServiceModule.getInstance();
-      const paymentIntent = await stripeService.confirmPayment(payment_intent_id);
-      
-      if (paymentIntent.status !== 'succeeded') {
-        return res.status(400).json({
-          success: false,
-          error: 'El pago no ha sido completado'
-        });
-      }
-
-      // Extraer datos del pedido de los metadatos
-      const items = JSON.parse(paymentIntent.metadata.items || '[]');
-      const shippingAddress = JSON.parse(paymentIntent.metadata.shipping_address || '{}');
-      
-      orderData = {
-        external_id: paymentIntent.id,
-        line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
-          product_id: item.productId,
-          variant_id: item.variantId,
-          quantity: item.quantity
-        })),
-        shipping_method: 1,
-        is_printify_express: false,
-        send_shipping_notification: true,
-        address_to: shippingAddress
-      };
-    } else {
-      return res.status(400).json({
-        success: false,
-        error: 'Se requiere payment_intent_id o session_id'
-      });
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({ success: false, error: 'El pago no ha sido completado' });
     }
 
-    // Crear pedido en Printify
+    // --- INICIO DE LA CORRECCIÓN BASADA EN TU CAPTURA ---
+    // Accedemos a los detalles del cliente, que contienen la dirección
+    const customerDetails = session.customer_details;
+
+    // Verificamos que tanto los detalles del cliente como la dirección existen
+    if (!customerDetails || !customerDetails.address) {
+      throw new Error('No se encontraron los detalles de envío del cliente en la sesión de Stripe.');
+    }
+    const shippingAddress = customerDetails.address;
+    // --- FIN DE LA CORRECCIÓN ---
+    
+    const items = JSON.parse(session.metadata?.items || '[]');
+    
+    const orderData: OrderRequest = {
+      external_id: session.id,
+      line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
+        product_id: item.productId,
+        variant_id: item.variantId,
+        quantity: item.quantity
+      })),
+      shipping_method: 1,
+      is_printify_express: false,
+      send_shipping_notification: true,
+      address_to: {
+        first_name: customerDetails.name?.split(' ')[0] || '',
+        last_name: customerDetails.name?.split(' ').slice(1).join(' ') || '',
+        email: customerDetails.email || '',
+        phone: customerDetails.phone || '',
+        // Usamos la variable `shippingAddress` que hemos verificado
+        country: shippingAddress.country || '',
+        region: shippingAddress.state || '',
+        address1: shippingAddress.line1 || '',
+        address2: shippingAddress.line2 || '',
+        city: shippingAddress.city || '',
+        zip: shippingAddress.postal_code || ''
+      }
+    };
+
     const printifyService = printifyServiceModule.getInstance();
     const printifyOrder = await printifyService.createOrder(orderData);
     
-    // Enviar pedido a producción automáticamente solo si está activado
-    const autoSubmit = process.env.PRINTIFY_AUTO_SUBMIT_TO_PRODUCTION === 'true';
-    let productionResult = { submitted: false };
+    await db.findOrderByStripeIdAndUpdate(session.id, {
+      printifyOrderId: printifyOrder.id,
+      status: 'processing'
+    });
 
+    const autoSubmit = process.env.PRINTIFY_AUTO_SUBMIT_TO_PRODUCTION === 'true';
     if (autoSubmit) {
-      const result = await printifyService.submitOrderToProduction(printifyOrder.id);
-      productionResult.submitted = result;
+      await printifyService.submitOrderToProduction(printifyOrder.id);
     }
     
-    const response: ApiResponse<any> = {
+    res.status(200).json({
       success: true,
-      data: {
-        order_id: printifyOrder.id,
-        external_id: printifyOrder.external_id,
-        status: printifyOrder.status,
-        sent_to_production: productionResult.submitted
-      },
-      message: `Pedido procesado exitosamente. Envío a producción: ${autoSubmit}`
-    };
-
-    res.status(200).json(response);
+      data: { order_id: printifyOrder.id, status: printifyOrder.status },
+      message: `Pedido procesado. Envío a producción: ${autoSubmit}`
+    });
     
   } catch (error: any) {
     console.error('Error al procesar pedido:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error al procesar el pedido: ' + error.message
-    });
+    res.status(500).json({ success: false, error: 'Error al procesar el pedido: ' + error.message });
   }
 });
+
 
 // Obtener estado de un pedido
 export const getOrderStatus = asyncHandler(async (req: Request, res: Response) => {
