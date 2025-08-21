@@ -25,7 +25,8 @@ function validatePrintifySignature(req: Request): boolean {
   const signature = req.headers['x-pfy-signature'];
   const secret = process.env.PRINTIFY_WEBHOOK_SECRET;
   if (!signature || !secret) return false;
-  const body = JSON.stringify(req.body);
+  // Usar el buffer directamente
+  const body = req.body instanceof Buffer ? req.body : Buffer.from(JSON.stringify(req.body));
   const hash = crypto.createHmac('sha256', secret).update(body).digest('hex');
   const expected = `sha256=${hash}`;
   return crypto.timingSafeEqual(Buffer.from(signature as string), Buffer.from(expected));
