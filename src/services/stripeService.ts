@@ -127,6 +127,9 @@ class StripeService {
         shipping_address_collection: {
           allowed_countries: shippingOption.allowed_countries,
         },
+        phone_number_collection: {
+          enabled: true
+        },
         shipping_options: [
           {
             shipping_rate_data: {

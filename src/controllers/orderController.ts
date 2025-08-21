@@ -240,7 +240,6 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
         last_name: customerDetails.name?.split(' ').slice(1).join(' ') || '',
         email: customerDetails.email || '',
         phone: customerDetails.phone || '',
-        // Usamos la variable `shippingAddress` que hemos verificado
         country: shippingAddress.country || '',
         region: shippingAddress.state || '',
         address1: shippingAddress.line1 || '',

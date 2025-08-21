@@ -22,6 +22,7 @@ interface IOrder extends Document {
     city: string;
     postalCode: string;
     country: string;
+    phone: string;
   };
   totalAmount: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -49,6 +50,7 @@ const OrderSchema: Schema = new Schema({
     city: String,
     postalCode: String,
     country: String,
+    phone: String,
   },
   totalAmount: { type: Number, required: true },
   status: { type: String, default: 'pending' },

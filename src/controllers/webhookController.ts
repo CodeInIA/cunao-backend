@@ -110,7 +110,7 @@ async function handleCheckoutCompleted(session: any) {
   await db.saveOrder({
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
-    customerName: session.customer_details.name, // Ya guardamos el nombre completo aquí
+    customerName: session.customer_details.name,
     totalAmount: session.amount_total / 100,
     lineItems: JSON.parse(session.metadata?.items || '[]'),
     shippingDetails: {
@@ -118,11 +118,11 @@ async function handleCheckoutCompleted(session: any) {
       city: session.customer_details.address?.city || '',
       postalCode: session.customer_details.address?.postal_code || '',
       country: session.customer_details.address?.country || '',
+      phone: session.customer_details.phone || '',
     },
     status: 'pending'
   });
 
-  // La función de notificación ya coge el nombre de la sesión
   await notificationService.sendOrderConfirmationEmail(session);
 }
 
