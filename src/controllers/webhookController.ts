@@ -17,25 +17,18 @@ function slugify(text: string): string {
 function validatePrintifySignature(req: Request): boolean {
   const signature = req.headers['x-pfy-signature'] as string;
   const secret = process.env.PRINTIFY_WEBHOOK_SECRET;
-  
   if (!signature || !secret) {
     console.error('Falta la firma o el secreto para el webhook de Printify.');
     return false;
   }
-  
-  const body = req.body;
-  if (!body) {
-      console.error('El cuerpo de la petición (rawBody) no está disponible para la validación.');
-      return false;
-  }
-
+  // Usar el buffer original
+  const body = req.body instanceof Buffer ? req.body : Buffer.from(JSON.stringify(req.body));
   const hash = crypto.createHmac('sha256', secret).update(body).digest('hex');
   const expectedSignature = `sha256=${hash}`;
-  
   try {
-      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   } catch {
-      return false;
+    return false;
   }
 }
 
