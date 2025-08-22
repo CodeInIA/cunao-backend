@@ -96,6 +96,26 @@ class PrintifyService {
     }
   }
 
+  // Obtener todas las órdenes del shop (paginación)
+  async getOrders(): Promise<any[]> {
+    let allOrders: any[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      try {
+        const response = await this.api.get(`/shops/${this.shopId}/orders.json`, { params: { page } });
+        const orders = response.data.data || [];
+        allOrders = allOrders.concat(orders);
+        hasMore = orders.length > 0;
+        page++;
+      } catch (error) {
+        console.error('Error al obtener órdenes de Printify:', error);
+        break;
+      }
+    }
+    return allOrders;
+  }
+
   // Obtener información de un pedido
   async getOrder(orderId: string): Promise<PrintifyOrder | null> {
     try {
@@ -104,6 +124,17 @@ class PrintifyService {
     } catch (error) {
       console.error(`Error al obtener pedido ${orderId}:`, error);
       return null;
+    }
+  }
+
+    // Cancelar un pedido en Printify
+  async cancelOrder(orderId: string): Promise<boolean> {
+    try {
+      await this.api.post(`/shops/${this.shopId}/orders/${orderId}/cancel.json`);
+      return true;
+    } catch (error) {
+      console.error(`Error al cancelar el pedido ${orderId} en Printify:`, error);
+      return false;
     }
   }
 
