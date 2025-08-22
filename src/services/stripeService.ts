@@ -72,9 +72,11 @@ class StripeService {
     successUrl: string,
     cancelUrl: string,
     metadata: Record<string, string> = {},
-    shippingRegion: string
+    options?: { shippingRegion?: string; client_reference_id?: string }
   ): Promise<Stripe.Checkout.Session> {
     try {
+      const shippingRegion = options?.shippingRegion || '';
+      const clientReferenceId = options?.client_reference_id;
       const subtotal = metadata.items ? JSON.parse(metadata.items).reduce((total: number, item: CartItem) => total + item.price * item.quantity, 0) : 0;
       const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
       const isFreeShipping = subtotal >= freeShippingThreshold;
@@ -99,9 +101,9 @@ class StripeService {
           throw new Error('Región de envío no válida');
       }
 
-      const session = await this.stripe.checkout.sessions.create({
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         payment_method_types: ['card'],
-        line_items: lineItems, // <-- Simplemente usamos el array que nos llega
+        line_items: lineItems,
         mode: 'payment',
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -125,8 +127,12 @@ class StripeService {
           },
         ],
         billing_address_collection: 'required'
-      });
+      };
+      if (clientReferenceId) {
+        sessionParams.client_reference_id = clientReferenceId;
+      }
 
+      const session = await this.stripe.checkout.sessions.create(sessionParams);
       return session;
     } catch (error: any) {
       console.error('Error al crear sesión de checkout:', error);

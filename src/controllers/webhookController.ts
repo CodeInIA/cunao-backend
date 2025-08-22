@@ -100,18 +100,17 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
 async function handleCheckoutCompleted(session: any) {
   console.log('Checkout completado:', session.id);
 
-  // --- INICIO DE LA MEJOR PRÁCTICA ---
-  // Ahora los metadatos contienen toda la información que necesitamos.
-  // Simplemente la parseamos y la guardamos directamente.
-  const lineItems = JSON.parse(session.metadata?.items || '[]');
-  // --- FIN DE LA MEJOR PRÁCTICA ---
-
-  await db.saveOrder({
+  // Usar client_reference_id para actualizar la orden existente
+  const orderId = session.client_reference_id;
+  if (!orderId) {
+    console.error('No se recibió client_reference_id en la sesión de Stripe.');
+    return;
+  }
+  const updatedOrder = await db.findOrderByIdAndUpdate(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
     customerName: session.customer_details.name,
     totalAmount: session.amount_total / 100,
-    lineItems: lineItems, // <-- Guardamos la lista completa y detallada
     shippingDetails: {
       address: session.customer_details.address?.line1 || '',
       city: session.customer_details.address?.city || '',
@@ -121,8 +120,10 @@ async function handleCheckoutCompleted(session: any) {
     },
     status: 'pending'
   });
-
-  // El envío de email ahora también tendrá la información completa
+  if (!updatedOrder) {
+    console.error('No se encontró la orden en la base de datos para actualizar por client_reference_id:', orderId);
+    return;
+  }
   await notificationService.sendOrderConfirmationEmail(session);
 }
 

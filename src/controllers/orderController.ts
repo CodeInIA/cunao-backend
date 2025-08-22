@@ -98,38 +98,80 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     return res.status(400).json({ success: false, error: 'La región de envío es obligatoria' });
   }
 
-  const printifyService = printifyServiceModule.getInstance();
-  const productPromises = items.map((item: CartItem) => printifyService.getProduct(item.productId));
-  const printifyProducts = await Promise.all(productPromises);
 
-  const secureItems = items.map((item: CartItem, index: number) => {
-    const product = printifyProducts[index];
+  // Guardar el carrito y la región en la base de datos antes de crear la sesión de Stripe
+  // Obtener los datos completos de los productos antes de guardar el pedido temporal
+  const printifyServiceTemp = printifyServiceModule.getInstance();
+  const productPromisesTemp = items.map((item: CartItem) => printifyServiceTemp.getProduct(item.productId));
+  const printifyProductsTemp = await Promise.all(productPromisesTemp);
+  const secureItemsTemp = items.map((item: CartItem, index: number) => {
+    const product = printifyProductsTemp[index];
     if (!product) throw new Error(`Producto con ID ${item.productId} no encontrado.`);
-    
     const variant = product.variants.find((v: PrintifyVariant) => v.id === item.variantId);
-    
-    // --- INICIO DE LA CORRECIÓN ---
-    // Añadimos una comprobación de seguridad para la variante y su ID
     if (!variant || typeof variant.id === 'undefined') {
       throw new Error(`Variante con ID ${item.variantId} no válida o sin ID para el producto ${item.productId}.`);
     }
-    // --- FIN DE LA CORRECIÓN ---
-    
-    const mainImage = product.images.find((img: ProductImage) => img.is_default) || product.images[0];
     const sizeOption = product.options.find((opt: ProductOption) => opt.type === 'size');
     const colorOption = product.options.find((opt: ProductOption) => opt.type === 'color');
     const size = sizeOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
     const color = colorOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
+    const variantImage = product.images.find((img: ProductImage) => img.variant_ids?.includes(variant.id));
+    const mainImage = product.images.find((img: ProductImage) => img.is_default) || product.images[0];
+    const imageToShow = variantImage?.src || mainImage?.src || '';
+    return {
+      productId: product.id,
+      variantId: variant.id,
+      title: product.title,
+      size,
+      color,
+      quantity: item.quantity,
+      price: variant.price / 100,
+      image: imageToShow
+    };
+  });
 
+  const tempOrder = await db.saveOrder({
+    stripeSessionId: '', // Se actualizará después
+    customerEmail: '', // Se actualizará después
+    customerName: '', // Se actualizará después
+    lineItems: secureItemsTemp,
+    shippingDetails: {
+      address: '',
+      city: '',
+      postalCode: '',
+      country: '',
+      phone: ''
+    },
+    totalAmount: secureItemsTemp.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0),
+    status: 'pending',
+    region: shippingRegion
+  });
+
+  // Preparar los datos para Stripe
+  const printifyService = printifyServiceModule.getInstance();
+  const productPromises = items.map((item: CartItem) => printifyService.getProduct(item.productId));
+  const printifyProducts = await Promise.all(productPromises);
+  const secureItems = items.map((item: CartItem, index: number) => {
+    const product = printifyProducts[index];
+    if (!product) throw new Error(`Producto con ID ${item.productId} no encontrado.`);
+    const variant = product.variants.find((v: PrintifyVariant) => v.id === item.variantId);
+    if (!variant || typeof variant.id === 'undefined') {
+      throw new Error(`Variante con ID ${item.variantId} no válida o sin ID para el producto ${item.productId}.`);
+    }
+    const sizeOption = product.options.find((opt: ProductOption) => opt.type === 'size');
+    const size = sizeOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
+    const mainImage = product.images.find((img: ProductImage) => img.is_default) || product.images[0];
+    const variantImage = product.images.find((img: ProductImage) => img.variant_ids?.includes(variant.id));
+    const imageToShow = variantImage?.src || mainImage?.src || '';
     return {
       productId: product.id,
       variantId: variant.id,
       quantity: item.quantity,
       title: product.title,
       price: variant.price / 100,
-      image: mainImage?.src || '',
+      image: imageToShow,
       size,
-      color,
+      color: item.color || '',
     };
   });
 
@@ -150,33 +192,32 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     price_data: {
       currency: 'eur',
       product_data: {
-        name: item.title,
-        images: [item.image],
-        metadata: {
-          productId: item.productId,
-          variantId: item.variantId.toString(),
-          size: item.size,
-          color: item.color
-        }
+        name: `${item.title} - Talla ${item.size}`,
+        images: [item.image]
       },
       unit_amount: Math.round(item.price * 100)
     },
     quantity: item.quantity
   }));
   
-  const metadataForSession = {
-    items: JSON.stringify(secureItems),
-    shippingRegion: shippingRegion
-  };
-
+  // Usar solo el ID del pedido en client_reference_id
   const stripeService = stripeServiceModule.getInstance();
+  // Tipar el _id correctamente
+  // Usar el ID temporal del pedido como client_reference_id
+  const tempOrderId = tempOrder?._id ? String(tempOrder._id) : '';
   const session = await stripeService.createCheckoutSession(
     lineItemsForStripe,
     successUrl,
     cancelUrl,
-    metadataForSession,
-    shippingRegion
+    {}, // Sin metadata
+    {
+      shippingRegion,
+      client_reference_id: tempOrderId
+    }
   );
+
+  // Actualizar el pedido temporal con el sessionId de Stripe
+  await db.findOrderByStripeIdAndUpdate(session.id, { stripeSessionId: session.id });
 
   res.status(200).json({
     success: true,
@@ -210,11 +251,37 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     const shippingAddress = customerDetails.address;
     // --- FIN DE LA CORRECCIÓN ---
     
-    const items = JSON.parse(session.metadata?.items || '[]');
-    
+    // Recuperar el pedido temporal usando el client_reference_id
+    const orderId = session.client_reference_id;
+    if (!orderId) {
+      throw new Error('No se recibió client_reference_id en la sesión de Stripe.');
+    }
+    let order = await db.findOrderByIdAndUpdate(orderId, {
+      stripeSessionId: session.id,
+      customerEmail: customerDetails.email || '',
+      customerName: customerDetails.name || '',
+      shippingDetails: {
+        address: shippingAddress.line1 || '',
+        city: shippingAddress.city || '',
+        postalCode: shippingAddress.postal_code || '',
+        country: shippingAddress.country || '',
+        phone: customerDetails.phone || ''
+      },
+      totalAmount: session.amount_total ? session.amount_total / 100 : 0,
+      status: 'processing'
+    });
+    if (!order) {
+      throw new Error('No se encontró el pedido temporal en la base de datos por client_reference_id.');
+    }
+
+    // Validar que el pedido tiene productos
+    if (!order.lineItems || !Array.isArray(order.lineItems) || order.lineItems.length === 0) {
+      throw new Error('El pedido no tiene productos para enviar a Printify.');
+    }
+
     const orderData: OrderRequest = {
       external_id: session.id,
-      line_items: items.map((item: { productId: string; variantId: number; quantity: number }) => ({
+      line_items: order.lineItems.map((item: any) => ({
         product_id: item.productId,
         variant_id: item.variantId,
         quantity: item.quantity
@@ -238,7 +305,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
 
     const printifyService = printifyServiceModule.getInstance();
     const printifyOrder = await printifyService.createOrder(orderData);
-    
+
     await db.findOrderByStripeIdAndUpdate(session.id, {
       printifyOrderId: printifyOrder.id,
       status: 'processing'
@@ -248,7 +315,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     if (autoSubmit) {
       await printifyService.submitOrderToProduction(printifyOrder.id);
     }
-    
+
     res.status(200).json({
       success: true,
       data: { order_id: printifyOrder.id, status: printifyOrder.status },

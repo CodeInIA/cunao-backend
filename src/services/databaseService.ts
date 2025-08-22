@@ -28,14 +28,15 @@ interface IOrder extends Document {
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   trackingUrl?: string;
+  region?: string;
 }
 
 // --- Esquema de Mongoose para el Pedido ---
 const OrderSchema: Schema = new Schema({
   printifyOrderId: { type: String, index: true },
-  stripeSessionId: { type: String, required: true, unique: true, index: true },
-  customerEmail: { type: String, required: true },
-  customerName: { type: String, required: true },
+  stripeSessionId: { type: String, required: false, index: true },
+  customerEmail: { type: String, required: false },
+  customerName: { type: String, required: false },
   lineItems: [{
     productId: String,
     variantId: Number,
@@ -56,6 +57,7 @@ const OrderSchema: Schema = new Schema({
   status: { type: String, default: 'pending' },
   trackingNumber: String,
   trackingUrl: String,
+  region: { type: String },
 }, {
   timestamps: true
 });
@@ -63,6 +65,10 @@ const OrderSchema: Schema = new Schema({
 const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
 
 class DatabaseService {
+  // Actualizar pedido por _id
+  public async findOrderByIdAndUpdate(orderId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
+    return Order.findByIdAndUpdate(orderId, updateData, { new: true }).exec();
+  }
   private static instance: DatabaseService;
 
   private constructor() {}
