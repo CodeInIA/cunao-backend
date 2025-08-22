@@ -71,7 +71,7 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
 
   res.status(200).json({ received: true });
 
-  const event = JSON.parse((req as any).rawBody.toString('utf8'));
+  const event = JSON.parse(req.body.toString('utf8'));
   console.log('Evento de Printify recibido y aceptado, procesando:', event.type);
 
   try {
