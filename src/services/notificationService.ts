@@ -4,17 +4,17 @@ import Stripe from 'stripe';
 import { sendEmail } from './emailService.js';
 import stripeService from './stripeService.js';
 
-// --- PLANTILLA PRINCIPAL DE EMAIL ---
-// Esta función crea el "marco" del correo con el estilo de tu marca.
+// --- PLANTILLA PRINCIPAL DE EMAIL MEJORADA ---
 const generateEmailTemplate = (title: string, content: string): string => {
-  const LOGO_URL = 'https://www.cunadismoilustrado.me/logo-sin-letras.png'; // He subido tu logo a un hosting de imágenes
+  const LOGO_URL = 'https://i.imgur.com/kxtvDwW.png'; // Logo sin letras
   const WEBSITE_URL = process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
 
-  // Colores de tu marca
-  const backgroundColor = '#1a202c'; // Azul oscuro de fondo
-  const contentBackgroundColor = '#2d3748'; // Gris oscuro para el contenido
-  const textColor = '#ffffff';
-  const accentColor = '#eab308'; // Amarillo/dorado para botones y enlaces
+  // Paleta de colores de tu marca
+  const bgColor = '#1E293B'; // Azul oscuro/grisáceo de fondo
+  const contentBgColor = '#0F172A'; // Azul casi negro para el contenido
+  const textColor = '#E2E8F0'; // Texto principal (blanco roto)
+  const accentColor = '#FBBF24'; // Amarillo/dorado para botones y detalles
+  const secondaryTextColor = '#94A3B8'; // Gris claro para texto secundario
 
   return `
     <!DOCTYPE html>
@@ -23,29 +23,38 @@ const generateEmailTemplate = (title: string, content: string): string => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${title}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Lato:wght@400;700&display=swap');
+        body { font-family: 'Lato', Arial, sans-serif; }
+        h1, h2, h3 { font-family: 'Merriweather', 'Georgia', serif; }
+      </style>
     </head>
-    <body style="margin: 0; padding: 0; background-color: ${backgroundColor}; font-family: Arial, sans-serif;">
+    <body style="margin: 0; padding: 0; background-color: ${bgColor}; font-family: 'Lato', Arial, sans-serif;">
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
-          <td style="padding: 20px 0;">
-            <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: collapse; background-color: ${contentBackgroundColor}; border-radius: 8px; overflow: hidden;">
+          <td style="padding: 40px 10px;">
+            <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; border-collapse: collapse; background-color: ${contentBgColor}; border-radius: 8px; overflow: hidden; border: 1px solid #334155;">
               <tr>
-                <td align="center" style="padding: 30px 0;">
-                  <a href="${WEBSITE_URL}">
-                    <img src="${LOGO_URL}" alt="Cuñadismo Ilustrado" width="150" style="display: block;" />
+                <td align="center" style="padding: 40px 0 20px 0;">
+                  <a href="${WEBSITE_URL}" style="text-decoration: none;">
+                    <img src="${LOGO_URL}" alt="Cuñadismo Ilustrado Logo" width="100" style="display: block; margin: 0 auto;" />
+                    <div style="margin-top: 15px;">
+                      <span style="font-family: 'Merriweather', 'Georgia', serif; font-size: 28px; font-weight: 700; color: #FFFFFF; letter-spacing: 1px;">Cuñadismo</span>
+                      <span style="font-family: 'Merriweather', 'Georgia', serif; font-size: 28px; font-weight: 700; color: ${accentColor}; letter-spacing: 1px;">Ilustrado</span>
+                    </div>
                   </a>
                 </td>
               </tr>
               <tr>
-                <td style="padding: 20px 30px; color: ${textColor}; font-size: 16px; line-height: 1.5;">
-                  <h1 style="color: ${textColor}; font-size: 24px;">${title}</h1>
+                <td style="padding: 20px 40px; color: ${textColor}; font-size: 16px; line-height: 1.6;">
+                  <h1 style="color: ${textColor}; font-family: 'Merriweather', 'Georgia', serif;">${title}</h1>
                   ${content}
                 </td>
               </tr>
               <tr>
-                <td align="center" style="padding: 20px 30px; font-size: 12px; color: #718096;">
+                <td align="center" style="padding: 30px 40px; font-size: 12px; line-height: 1.5; color: ${secondaryTextColor}; border-top: 1px solid #334155;">
                   <p>&copy; ${new Date().getFullYear()} Cuñadismo Ilustrado. Todos los derechos reservados.</p>
-                  <p><a href="${WEBSITE_URL}" style="color: ${accentColor}; text-decoration: none;">Visita nuestra tienda</a></p>
+                  <p><a href="${WEBSITE_URL}" style="color: ${accentColor}; text-decoration: none; font-weight: bold;">Visita nuestra tienda</a></p>
                 </td>
               </tr>
             </table>
@@ -66,18 +75,20 @@ export async function sendOrderConfirmationEmail(session: any) {
   const stripe = stripeService.getInstance();
   const lineItems = await stripe.getCheckoutSessionLineItems(session.id);
 
-  let itemsHtml = '<ul style="list-style-type: none; padding: 0;">';
+  let itemsHtml = '<div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 20px;">';
   lineItems.data.forEach((item: Stripe.LineItem) => {
-    itemsHtml += `<li style="margin-bottom: 10px;">${item.quantity}x - ${item.description}</li>`;
+    itemsHtml += `<p style="margin: 0 0 10px 0;"><strong>${item.quantity}x</strong> - ${item.description}</p>`;
   });
-  itemsHtml += '</ul>';
+  itemsHtml += '</div>';
 
   const title = `¡Gracias por tu pedido, ${customerName}!`;
   const content = `
     <p>Hemos recibido tu pedido y ya lo estamos procesando. Aquí tienes un resumen:</p>
     ${itemsHtml}
-    <p style="font-size: 18px; font-weight: bold;">Total: ${orderTotal}€</p>
-    <p>Recibirás otra notificación tan pronto como tu pedido sea enviado.</p>
+    <p style="font-size: 20px; font-weight: bold; color: #FFFFFF; text-align: right; margin-top: 20px;">Total: ${orderTotal}€</p>
+    <p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 14px; color: #94A3B8;">
+      Recibirás un segundo correo con la información de seguimiento tan pronto como tu pedido sea enviado.
+    </p>
     <p>Gracias por confiar en la sabiduría de barra de bar,</p>
     <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>
   `;
@@ -95,18 +106,17 @@ export async function sendShippingConfirmationEmail(shipmentData: any, customerE
   const title = '¡Tu pedido ya está en camino!';
   const content = `
     <p>Hola ${customerName},</p>
-    <p>¡Buenas noticias! Tu pedido está en manos del transportista y va de camino.</p>
-    <p>Puedes seguir tu paquete usando el siguiente enlace:</p>
+    <p>¡Buenas noticias! Tu pedido está en manos del transportista y va de camino. Puedes seguir tu paquete usando el siguiente enlace:</p>
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
       <tr>
-        <td align="center" style="padding: 15px 0;">
-          <a href="${trackingUrl}" style="background-color: #eab308; color: #1a202c; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+        <td align="center" style="padding: 20px 0;">
+          <a href="${trackingUrl}" style="background-color: #FBBF24; color: #0F172A; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: 'Lato', Arial, sans-serif;">
             Seguir mi envío
           </a>
         </td>
       </tr>
     </table>
-    <p style="text-align: center; font-size: 14px;">Nº de seguimiento: ${trackingNumber}</p>
+    <p style="text-align: center; font-size: 14px; color: #94A3B8;">Nº de seguimiento: ${trackingNumber}</p>
     <p>¡Esperamos que disfrutes de tu dosis de sabiduría ilustrada!</p>
     <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>
   `;

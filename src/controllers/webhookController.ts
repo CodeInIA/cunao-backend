@@ -23,7 +23,7 @@ function validatePrintifySignature(req: Request): boolean {
     return false;
   }
   
-  const body = (req as any).rawBody;
+  const body = req.body;
   if (!body) {
       console.error('El cuerpo de la petición (rawBody) no está disponible para la validación.');
       return false;
