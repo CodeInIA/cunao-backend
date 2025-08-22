@@ -1,8 +1,11 @@
 // src/services/notificationService.ts
 
+
 import Stripe from 'stripe';
 import { sendEmail } from './emailService.js';
 import stripeService from './stripeService.js';
+import printifyService from './printifyService.js';
+import { db } from './databaseService.js';
 
 // --- PLANTILLA PRINCIPAL DE EMAIL MEJORADA ---
 const generateEmailTemplate = (title: string, content: string): string => {
@@ -75,10 +78,49 @@ export async function sendOrderConfirmationEmail(session: any) {
   const stripe = stripeService.getInstance();
   const lineItems = await stripe.getCheckoutSessionLineItems(session.id);
 
+  // Recuperar el pedido temporal usando client_reference_id
+  const orderId = session.client_reference_id;
+  const order = await db.findOrderByIdAndUpdate(orderId, {});
+
   let itemsHtml = '<div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 20px;">';
-  lineItems.data.forEach((item: Stripe.LineItem) => {
-    itemsHtml += `<p style="margin: 0 0 10px 0;"><strong>${item.quantity}x</strong> - ${item.description}</p>`;
-  });
+  if (order && order.lineItems) {
+    for (const item of order.lineItems) {
+      let imageUrl = '';
+      if (item.productId && item.variantId) {
+        try {
+          const printify = printifyService.getInstance();
+          const product = await printify.getProduct(item.productId);
+          if (product && product.variants && Array.isArray(product.variants)) {
+            // Buscar la imagen asociada a la variante
+            if (product.images && Array.isArray(product.images)) {
+              const img = product.images.find((img: any) => img.variant_ids && img.variant_ids.includes(item.variantId));
+              if (img && img.src) {
+                imageUrl = img.src;
+              } else if (product.images.length > 0) {
+                imageUrl = product.images[0].src;
+              }
+            }
+          }
+        } catch (err) {
+          imageUrl = '';
+        }
+      }
+      itemsHtml += `
+        <div style="display: flex; align-items: center; margin-bottom: 16px;">
+          <img src="${imageUrl}" alt="${item.title}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; margin-right: 16px; border: 1px solid #e8d7c2;" />
+          <div>
+            <strong>${item.quantity}x</strong> ${item.title} <span style="color: #94A3B8;">(${item.size} / ${item.color})</span><br/>
+            <span style="font-weight: bold; color: #FBBF24;">${item.price.toFixed(2)}€</span>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    // Fallback: Stripe lineItems
+    lineItems.data.forEach((item: Stripe.LineItem) => {
+      itemsHtml += `<p style="margin: 0 0 10px 0;"><strong>${item.quantity}x</strong> - ${item.description}</p>`;
+    });
+  }
   itemsHtml += '</div>';
 
   const title = `¡Gracias por tu pedido, ${customerName}!`;
