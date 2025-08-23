@@ -117,8 +117,11 @@ export const getFeaturedProducts = asyncHandler(async (req: Request, res: Respon
   const featuredProducts = products
     .filter(product => 
       product.visible && 
-      (product.tags.map(tag => tag.toLowerCase()).includes('destacado') ||
-       product.tags.map(tag => tag.toLowerCase()).includes('popular'))
+      (
+        product.tags.map(tag => tag.toLowerCase()).includes('destacado') ||
+        product.tags.map(tag => tag.toLowerCase()).includes('popular') ||
+        product.tags.map(tag => tag.toLowerCase()).includes('clásico')
+      )
     )
     .slice(0, 6); // Máximo 6 productos destacados
 
