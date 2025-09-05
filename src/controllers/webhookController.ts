@@ -79,6 +79,9 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
       case 'product:publish:started':
         await handleProductPublishStarted(event.resource);
         break;
+      case 'product:deleted':
+        await handleProductDeleted(event.resource);
+        break;
       case 'order:shipment:created':
         await handleShipmentCreated(event.resource);
         break;
@@ -130,18 +133,56 @@ async function handleCheckoutCompleted(session: any) {
 // Printify
 async function handleProductPublishStarted(resource: any) {
     const productId = resource?.id;
-    if (!productId) return;
+    if (!productId) {
+        console.error('No se recibió ID del producto en el evento product:publish:started');
+        return;
+    }
 
-    const printifyService = printifyServiceModule.getInstance();
-    const product: PrintifyProduct | null = await printifyService.getProduct(productId);
-    if (!product) return;
+    console.log(`Procesando publicación del producto: ${productId}`);
 
-    const slug = slugify(product.title);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const handle = `${frontendUrl}/producto/${slug}`;
+    try {
+        const printifyService = printifyServiceModule.getInstance();
+        const product: PrintifyProduct | null = await printifyService.getProduct(productId);
+        
+        if (!product) {
+            console.error(`No se pudo obtener el producto ${productId} de Printify`);
+            return;
+        }
 
-    await printifyService.setPublishSucceeded(productId, productId, handle);
-    console.log(`Producto ${productId} marcado como publicado: ${handle}`);
+        // Guardar el producto en MongoDB
+        await db.saveOrUpdateProduct(product);
+
+        // Marcar como publicado en Printify
+        const slug = slugify(product.title);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const handle = `${frontendUrl}/producto/${slug}`;
+
+        await printifyService.setPublishSucceeded(productId, productId, handle);
+        console.log(`Producto ${productId} guardado en DB y marcado como publicado: ${handle}`);
+    } catch (error) {
+        console.error(`Error al procesar la publicación del producto ${productId}:`, error);
+    }
+}
+
+async function handleProductDeleted(resource: any) {
+    const productId = resource?.id;
+    if (!productId) {
+        console.error('No se recibió ID del producto en el evento product:deleted');
+        return;
+    }
+
+    console.log(`Procesando eliminación del producto: ${productId}`);
+
+    try {
+        const deleted = await db.deleteProductByPrintifyId(productId);
+        if (deleted) {
+            console.log(`Producto ${productId} eliminado exitosamente de la base de datos`);
+        } else {
+            console.log(`El producto ${productId} no se encontró en la base de datos`);
+        }
+    } catch (error) {
+        console.error(`Error al eliminar el producto ${productId}:`, error);
+    }
 }
 
 async function handleShipmentCreated(resource: any) {
