@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
-import { prepareNewsletterEmail } from '../routes/newsletter';
+import { prepareNewsletterEmail } from '../routes/newsletter.js';
 
 dotenv.config();
 
