@@ -5,8 +5,7 @@ import {
   getProductVariants,
   getFeaturedProducts,
   searchProducts,
-  getProductGPSR,
-  syncProducts
+  getProductGPSR
 } from '../controllers/productController.js';
 
 const router = Router();
@@ -15,7 +14,6 @@ const router = Router();
 router.get('/', getProducts);
 router.get('/featured', getFeaturedProducts);
 router.get('/search', searchProducts);
-router.post('/sync', syncProducts); // Nuevo endpoint para sincronización manual
 
 router.get('/:id', getProduct);
 
