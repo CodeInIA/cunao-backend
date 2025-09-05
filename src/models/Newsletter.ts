@@ -25,7 +25,6 @@ const NewsletterSchema: Schema = new Schema({
   timestamps: true
 });
 
-// Índice para optimizar búsquedas
-NewsletterSchema.index({ email: 1 });
+// No necesitamos índice manual ya que unique: true lo crea automáticamente
 
 export default mongoose.model<INewsletter>('Newsletter', NewsletterSchema);

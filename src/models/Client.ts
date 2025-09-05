@@ -68,8 +68,7 @@ const ClientSchema: Schema = new Schema({
   timestamps: true
 });
 
-// Índices para optimizar búsquedas
-ClientSchema.index({ email: 1 });
+// Índices para optimizar búsquedas (email único ya tiene su índice automático)
 ClientSchema.index({ emailMarketing: 1 });
 ClientSchema.index({ 'paymentInfo.stripeCustomerId': 1 });
 
