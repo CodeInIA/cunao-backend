@@ -1,6 +1,5 @@
 import cron from 'node-cron';
-import { sendNewsletterEmail, generatePreferencesUrl } from '../services/emailService';
-import * as db from '../services/databaseService';
+import { sendNewsletterEmail, generatePreferencesUrl } from '../services/emailService.js';
 import Newsletter from '../models/Newsletter.js';
 import Client from '../models/Client.js';
 
