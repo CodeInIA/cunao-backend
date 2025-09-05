@@ -13,6 +13,7 @@ interface IProduct extends Document {
     alt?: string;
     position: number;
     is_default: boolean;
+    variant_ids: number[];
   }[];
   variants: {
     id: number;
@@ -63,7 +64,8 @@ const ProductSchema: Schema = new Schema({
     src: { type: String, required: true },
     alt: { type: String },
     position: { type: Number, required: true },
-    is_default: { type: Boolean, default: false }
+    is_default: { type: Boolean, default: false },
+    variant_ids: [{ type: Number }]
   }],
   variants: [{
     id: { type: Number, required: true },
@@ -315,7 +317,8 @@ class DatabaseService {
         src: img.src,
         alt: img.alt || printifyProduct.title,
         position: position,
-        is_default: img.is_default || index === 0
+        is_default: img.is_default || index === 0,
+        variant_ids: img.variant_ids || []
       };
     }) || [];
 
