@@ -2,7 +2,7 @@
 
 import dotenv from 'dotenv';
 dotenv.config();
-import printifyService from '../services/printifyService.js';
+import printifyService from '../services/printifyService';
 
 async function cancelAllPrintifyOrders() {
   const printify = printifyService.getInstance();
