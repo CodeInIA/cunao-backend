@@ -146,31 +146,35 @@ async function handleCheckoutCompleted(session: any) {
     
     // Buscar si ya existe el cliente
     let existingClient = await Client.findOne({ email: customerEmail });
-    let newsletterId: Types.ObjectId | undefined;
-
-    // Si acepta email marketing, suscribir a newsletter
-    if (emailMarketing && customerEmail) {
-      try {
-        const existingNewsletter = await Newsletter.findOne({ email: customerEmail });
-        if (!existingNewsletter) {
-          const newNewsletter = new Newsletter({ email: customerEmail });
-          const savedNewsletter = await newNewsletter.save();
-          newsletterId = savedNewsletter._id as Types.ObjectId;
-          console.log(`Cliente suscrito a newsletter: ${customerEmail}`);
-        } else {
-          newsletterId = existingNewsletter._id as Types.ObjectId;
-        }
-      } catch (newsletterError) {
-        console.error('Error suscribiendo a newsletter:', newsletterError);
-      }
-    }
 
     if (existingClient) {
       // Actualizar cliente existente
       existingClient.orderIds.push(orderId);
-      existingClient.emailMarketing = emailMarketing;
-      if (newsletterId) {
-        existingClient.newsletterId = newsletterId;
+      
+      // Una vez que emailMarketing sea true, se mantiene en true
+      if (emailMarketing || existingClient.emailMarketing) {
+        existingClient.emailMarketing = true;
+      }
+      
+      // Si acepta email marketing o ya lo tenía activado, gestionar newsletter
+      if (existingClient.emailMarketing && customerEmail) {
+        try {
+          // Buscar newsletter existente
+          const existingNewsletter = await Newsletter.findOne({ email: customerEmail });
+          if (!existingNewsletter) {
+            // Crear nueva entrada en newsletter
+            const newNewsletter = new Newsletter({ email: customerEmail });
+            const savedNewsletter = await newNewsletter.save();
+            existingClient.newsletterId = savedNewsletter._id as Types.ObjectId;
+            console.log(`Cliente suscrito a newsletter: ${customerEmail}`);
+          } else {
+            // Usar newsletter existente
+            existingClient.newsletterId = existingNewsletter._id as Types.ObjectId;
+            console.log(`Cliente referenciado a newsletter existente: ${customerEmail}`);
+          }
+        } catch (newsletterError) {
+          console.error('Error gestionando newsletter:', newsletterError);
+        }
       }
       
       // Actualizar información de pago
@@ -181,6 +185,29 @@ async function handleCheckoutCompleted(session: any) {
       console.log(`Cliente actualizado: ${customerEmail}`);
     } else {
       // Crear nuevo cliente
+      let newsletterId: Types.ObjectId | undefined;
+      
+      // Si acepta email marketing, gestionar newsletter
+      if (emailMarketing && customerEmail) {
+        try {
+          // Buscar newsletter existente
+          const existingNewsletter = await Newsletter.findOne({ email: customerEmail });
+          if (!existingNewsletter) {
+            // Crear nueva entrada en newsletter
+            const newNewsletter = new Newsletter({ email: customerEmail });
+            const savedNewsletter = await newNewsletter.save();
+            newsletterId = savedNewsletter._id as Types.ObjectId;
+            console.log(`Cliente suscrito a newsletter: ${customerEmail}`);
+          } else {
+            // Usar newsletter existente
+            newsletterId = existingNewsletter._id as Types.ObjectId;
+            console.log(`Cliente referenciado a newsletter existente: ${customerEmail}`);
+          }
+        } catch (newsletterError) {
+          console.error('Error gestionando newsletter:', newsletterError);
+        }
+      }
+      
       const newClient = new Client({
         name: customerName || 'Cliente',
         email: customerEmail,
