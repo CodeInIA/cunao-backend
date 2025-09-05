@@ -4,6 +4,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { ApiResponse } from '../types';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import Newsletter from '../models/Newsletter.js';
 import { subscribeToNewsletter, sendManualNewsletter, addTestSubscriber, updateMarketingPreferences } from '../controllers/newsletterController.js';
 
 const router = Router();
@@ -93,7 +94,6 @@ router.post('/validate-token', [
 
   try {
     // Buscar en la base de datos MongoDB todos los newsletters
-    const Newsletter = (await import('../models/Newsletter')).default;
     const newsletters = await Newsletter.find({ lastToken: { $exists: true, $ne: null } });
 
     let foundNewsletter = null;
@@ -176,7 +176,6 @@ router.put('/update-preferences', [
 
   try {
     // Buscar en la base de datos MongoDB
-    const Newsletter = (await import('../models/Newsletter')).default;
     const newsletters = await Newsletter.find({ lastToken: { $exists: true, $ne: null } });
 
     let foundNewsletter = null;
@@ -295,7 +294,6 @@ router.post('/unsubscribe-all', [
 
   try {
     // Buscar en la base de datos MongoDB
-    const Newsletter = (await import('../models/Newsletter')).default;
     const newsletters = await Newsletter.find({ lastToken: { $exists: true, $ne: null } });
 
     let foundNewsletter = null;
@@ -369,8 +367,6 @@ router.post('/unsubscribe-all', [
 export const prepareNewsletterEmail = async (email: string): Promise<string> => {
   try {
     // Importar el modelo Newsletter
-    const Newsletter = (await import('../models/Newsletter')).default;
-    
     // Generar nuevo token
     const token = generateNewsletterToken(email);
     
