@@ -142,18 +142,26 @@ async function handleProductPublishStarted(resource: any) {
 
     try {
         const printifyService = printifyServiceModule.getInstance();
-        const product: PrintifyProduct | null = await printifyService.getProduct(productId);
         
-        if (!product) {
+        // Hacer GET a la API de Printify para obtener la información completa del producto
+        const fullProduct = await printifyService.getProduct(productId);
+        
+        if (!fullProduct) {
             console.error(`No se pudo obtener el producto ${productId} de Printify`);
             return;
         }
 
-        // Guardar el producto en MongoDB
-        await db.saveOrUpdateProduct(product);
+        console.log(`Producto ${productId} obtenido de Printify API:`, {
+            title: fullProduct.title,
+            imagesCount: fullProduct.images?.length || 0,
+            variantsCount: fullProduct.variants?.length || 0
+        });
+
+        // Guardar el producto completo en MongoDB
+        await db.saveOrUpdateProduct(fullProduct);
 
         // Marcar como publicado en Printify
-        const slug = slugify(product.title);
+        const slug = slugify(fullProduct.title);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const handle = `${frontendUrl}/producto/${slug}`;
 
@@ -161,6 +169,7 @@ async function handleProductPublishStarted(resource: any) {
         console.log(`Producto ${productId} guardado en DB y marcado como publicado: ${handle}`);
     } catch (error) {
         console.error(`Error al procesar la publicación del producto ${productId}:`, error);
+        console.error('Stack trace:', error);
     }
 }
 

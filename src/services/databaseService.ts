@@ -293,17 +293,40 @@ class DatabaseService {
    * Mapear datos de producto de Printify al formato de base de datos
    */
   private mapPrintifyProductToDb(printifyProduct: any): Partial<IProduct> {
+    console.log('Mapeando producto de Printify:', {
+      id: printifyProduct.id,
+      title: printifyProduct.title,
+      imagesCount: printifyProduct.images?.length || 0,
+      variantsCount: printifyProduct.variants?.length || 0
+    });
+
+    // Procesar imágenes y manejar position "other"
+    const processedImages = printifyProduct.images?.map((img: any, index: number) => {
+      let position = index; // Por defecto usar el índice
+      
+      // Si position es un número válido, usarlo
+      if (typeof img.position === 'number' && !isNaN(img.position)) {
+        position = img.position;
+      }
+      
+      console.log(`Procesando imagen ${index}: position original="${img.position}", position final=${position}`);
+      
+      return {
+        src: img.src,
+        alt: img.alt || printifyProduct.title,
+        position: position,
+        is_default: img.is_default || index === 0
+      };
+    }) || [];
+
+    console.log(`Imágenes procesadas: ${processedImages.length}`);
+
     return {
       printifyId: printifyProduct.id,
       title: printifyProduct.title,
       description: printifyProduct.description || '',
       tags: printifyProduct.tags || [],
-      images: printifyProduct.images?.map((img: any, index: number) => ({
-        src: img.src,
-        alt: img.alt || printifyProduct.title,
-        position: typeof img.position === 'number' ? img.position : index,
-        is_default: img.is_default || index === 0
-      })) || [],
+      images: processedImages,
       variants: printifyProduct.variants || [],
       options: printifyProduct.options || [],
       print_areas: printifyProduct.print_areas || [],
