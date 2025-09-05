@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import Newsletter from '../models/Newsletter.js';
 import { ApiResponse } from '../types';
-import { sendNewsletterManual, addNewsletterSubscriber } from '../cron/weeklyNewsletter';
+import { sendNewsletterManual, addNewsletterSubscriber } from '../cron/weeklyNewsletter.js';
 
 interface NewsletterSubscriptionData {
   email: string;
