@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { asyncHandler } from '../middleware/errorHandler';
-import Newsletter from '../models/Newsletter';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import Newsletter from '../models/Newsletter.js';
 import { ApiResponse } from '../types';
 
 interface NewsletterSubscriptionData {
