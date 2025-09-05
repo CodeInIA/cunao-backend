@@ -200,6 +200,9 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     quantity: item.quantity
   }));
   
+  // Calcular subtotal para determinar envío gratuito
+  const subtotal = secureItems.reduce((total: number, item: any) => total + (item.price * item.quantity), 0);
+  
   // Usar solo el ID del pedido en client_reference_id
   const stripeService = stripeServiceModule.getInstance();
   // Tipar el _id correctamente
@@ -214,7 +217,8 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     }, // Metadata con preferencia de email marketing
     {
       shippingRegion,
-      client_reference_id: tempOrderId
+      client_reference_id: tempOrderId,
+      subtotal: subtotal
     }
   );
 

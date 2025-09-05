@@ -72,12 +72,19 @@ class StripeService {
     successUrl: string,
     cancelUrl: string,
     metadata: Record<string, string> = {},
-    options?: { shippingRegion?: string; client_reference_id?: string }
+    options?: { shippingRegion?: string; client_reference_id?: string; subtotal?: number }
   ): Promise<Stripe.Checkout.Session> {
     try {
       const shippingRegion = options?.shippingRegion || '';
       const clientReferenceId = options?.client_reference_id;
-      const subtotal = metadata.items ? JSON.parse(metadata.items).reduce((total: number, item: CartItem) => total + item.price * item.quantity, 0) : 0;
+      
+      // Calcular subtotal desde los lineItems o usar el proporcionado
+      const subtotal = options?.subtotal || lineItems.reduce((total: number, item) => {
+        const price = item.price_data?.unit_amount || 0;
+        const quantity = item.quantity || 1;
+        return total + (price * quantity / 100);
+      }, 0);
+      
       const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
       const isFreeShipping = subtotal >= freeShippingThreshold;
 

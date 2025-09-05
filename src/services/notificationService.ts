@@ -17,7 +17,7 @@ const generateEmailTemplate = (title: string, content: string): string => {
   const contentBgColor = '#0F172A'; // Azul casi negro para el contenido
   const textColor = '#E2E8F0'; // Texto principal (blanco roto)
   const accentColor = '#FBBF24'; // Amarillo/dorado para botones y detalles
-  const secondaryTextColor = '#94A3B8'; // Gris claro para texto secundario
+  const secondaryTextColor = '#FFFFFF'; // Blanco para texto secundario
 
   return `
     <!DOCTYPE html>
@@ -75,6 +75,21 @@ export async function sendOrderConfirmationEmail(session: any) {
   const customerName = session.customer_details.name.split(' ')[0];
   const orderTotal = (session.amount_total / 100).toFixed(2);
   
+  // Calcular subtotal
+  const subtotal = (session.amount_subtotal / 100).toFixed(2);
+  const subtotalValue = parseFloat(subtotal);
+  
+  // Determinar si es envío gratuito basado en el umbral
+  const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
+  const isFreeShipping = subtotalValue >= freeShippingThreshold;
+  
+  // Calcular costo de envío real
+  let shippingCost = '0';
+  if (!isFreeShipping) {
+    // Si no es envío gratuito, calcular la diferencia real
+    shippingCost = ((session.amount_total - session.amount_subtotal) / 100).toFixed(2);
+  }
+  
   const stripe = stripeService.getInstance();
   const lineItems = await stripe.getCheckoutSessionLineItems(session.id);
 
@@ -109,7 +124,7 @@ export async function sendOrderConfirmationEmail(session: any) {
         <div style="display: flex; align-items: center; margin-bottom: 16px;">
           <img src="${imageUrl}" alt="${item.title}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; margin-right: 16px; border: 1px solid #e8d7c2;" />
           <div>
-            <strong>${item.quantity}x</strong> ${item.title} <span style="color: #94A3B8;">(${item.size} / ${item.color})</span><br/>
+            <strong>${item.quantity}x</strong> ${item.title} <span style="color: #FFFFFF;">(${item.size} / ${item.color})</span><br/>
             <span style="font-weight: bold; color: #FBBF24;">${item.price.toFixed(2)}€</span>
           </div>
         </div>
@@ -123,16 +138,35 @@ export async function sendOrderConfirmationEmail(session: any) {
   }
   itemsHtml += '</div>';
 
+  // Desglose de precios
+  const priceBreakdown = `
+    <div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 20px;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="color: #E2E8F0;">Subtotal:</span>
+        <span style="color: #E2E8F0;">${subtotal}€</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="color: #E2E8F0;">Envío:</span>
+        <span style="color: #E2E8F0;">${parseFloat(shippingCost) === 0 ? 'GRATIS' : shippingCost + '€'}</span>
+      </div>
+      <hr style="border: none; border-top: 1px solid #475569; margin: 12px 0;">
+      <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
+        <span style="color: #FFFFFF;">Total:</span>
+        <span style="color: #FBBF24;">${orderTotal}€</span>
+      </div>
+    </div>
+  `;
+
   const title = `¡Gracias por tu pedido, ${customerName}!`;
   const content = `
-    <p>Hemos recibido tu pedido y ya lo estamos procesando. Aquí tienes un resumen:</p>
+    <p style="color: #FFFFFF;">Hemos recibido tu pedido y ya lo estamos procesando. Aquí tienes un resumen:</p>
     ${itemsHtml}
-    <p style="font-size: 20px; font-weight: bold; color: #FFFFFF; text-align: right; margin-top: 20px;">Total: ${orderTotal}€</p>
-    <p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 14px; color: #94A3B8;">
+    ${priceBreakdown}
+    <p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 14px; color: #FFFFFF;">
       Recibirás un segundo correo con la información de seguimiento tan pronto como tu pedido sea enviado.
     </p>
-    <p>Gracias por confiar en la sabiduría de barra de bar,</p>
-    <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>
+    <p style="color: #FFFFFF;">Gracias por confiar en la sabiduría de barra de bar,</p>
+    <p style="color: #FFFFFF;"><strong>El equipo de Cuñadismo Ilustrado</strong></p>
   `;
 
   const html = generateEmailTemplate(title, content);
@@ -158,7 +192,7 @@ export async function sendShippingConfirmationEmail(shipmentData: any, customerE
         </td>
       </tr>
     </table>
-    <p style="text-align: center; font-size: 14px; color: #94A3B8;">Nº de seguimiento: ${trackingNumber}</p>
+    <p style="text-align: center; font-size: 14px; color: #FFFFFF;">Nº de seguimiento: ${trackingNumber}</p>
     <p>¡Esperamos que disfrutes de tu dosis de sabiduría ilustrada!</p>
     <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>
   `;
