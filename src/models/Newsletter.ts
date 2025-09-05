@@ -2,6 +2,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface INewsletter extends Document {
   email: string;
+  lastToken?: string;
+  preferences: {
+    newsletter: boolean;
+    promotions: boolean;
+    newProducts: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +25,24 @@ const NewsletterSchema: Schema = new Schema({
         return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email);
       },
       message: 'Email no válido'
+    }
+  },
+  lastToken: {
+    type: String,
+    default: null
+  },
+  preferences: {
+    newsletter: {
+      type: Boolean,
+      default: true
+    },
+    promotions: {
+      type: Boolean,
+      default: true
+    },
+    newProducts: {
+      type: Boolean,
+      default: true
     }
   }
 }, {

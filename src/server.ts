@@ -5,7 +5,6 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
-
 import { errorHandler } from './middleware/errorHandler.js';
 import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
@@ -14,6 +13,7 @@ import configRoutes from './routes/config.js';
 import contactRoutes from './routes/contact.js';
 import newsletterRoutes from './routes/newsletter.js';
 import { db } from './services/databaseService.js';
+import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 
 dotenv.config();
 
@@ -83,4 +83,7 @@ app.set('trust proxy', 1);
 app.listen(PORT, () => {
   console.log(`🚀 Servidor de Cuñadismo Ilustrado ejecutándose en puerto ${PORT}`);
   console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Inicializar scheduler de newsletter
+  startNewsletterScheduler();
 });
