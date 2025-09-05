@@ -301,7 +301,7 @@ class DatabaseService {
       images: printifyProduct.images?.map((img: any, index: number) => ({
         src: img.src,
         alt: img.alt || printifyProduct.title,
-        position: img.position || index,
+        position: typeof img.position === 'number' ? img.position : index,
         is_default: img.is_default || index === 0
       })) || [],
       variants: printifyProduct.variants || [],

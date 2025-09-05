@@ -40,7 +40,7 @@ export interface OptionValue {
 export interface ProductImage {
   src: string;
   variant_ids: number[];
-  position: string;
+  position: string | number; // Printify puede enviar "other" o un número
   is_default: boolean;
 }
 
