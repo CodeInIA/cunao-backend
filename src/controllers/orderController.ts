@@ -89,7 +89,7 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
 
 // Crear sesión de checkout
 export const createCheckoutSession = asyncHandler(async (req: Request, res: Response) => {
-  const { items, shippingRegion } = req.body;
+  const { items, shippingRegion, emailMarketing } = req.body;
   
   if (!items || !items.length) {
     return res.status(400).json({ success: false, error: 'El carrito está vacío' });
@@ -209,7 +209,9 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     lineItemsForStripe,
     successUrl,
     cancelUrl,
-    {}, // Sin metadata
+    { 
+      email_marketing: emailMarketing ? 'true' : 'false'
+    }, // Metadata con preferencia de email marketing
     {
       shippingRegion,
       client_reference_id: tempOrderId

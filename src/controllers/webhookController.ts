@@ -1,11 +1,14 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import stripeServiceModule from '../services/stripeService.js';
 import printifyServiceModule from '../services/printifyService.js';
 import * as notificationService from '../services/notificationService.js';
-import { db } from '../services/databaseService.js'; // Asegúrate de que esta ruta sea correcta
+import { db } from '../services/databaseService.js';
 import { PrintifyProduct } from '../types/index.js';
+import Client from '../models/Client.js';
+import Newsletter from '../models/Newsletter.js';
 
 // --- Función slugify ---
 function slugify(text: string): string {
@@ -109,6 +112,8 @@ async function handleCheckoutCompleted(session: any) {
     console.error('No se recibió client_reference_id en la sesión de Stripe.');
     return;
   }
+
+  // Actualizar la orden existente
   const updatedOrder = await db.findOrderByIdAndUpdate(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
@@ -123,10 +128,88 @@ async function handleCheckoutCompleted(session: any) {
     },
     status: 'pending'
   });
+
   if (!updatedOrder) {
     console.error('No se encontró la orden en la base de datos para actualizar por client_reference_id:', orderId);
     return;
   }
+
+  // Guardar o actualizar datos del cliente
+  try {
+    const customerEmail = session.customer_details.email;
+    const customerName = session.customer_details.name;
+    const address = session.customer_details.address;
+    const phone = session.customer_details.phone;
+    
+    // Obtener metadata de email marketing del session
+    const emailMarketing = session.metadata?.email_marketing === 'true';
+    
+    // Buscar si ya existe el cliente
+    let existingClient = await Client.findOne({ email: customerEmail });
+    let newsletterId: Types.ObjectId | undefined;
+
+    // Si acepta email marketing, suscribir a newsletter
+    if (emailMarketing && customerEmail) {
+      try {
+        const existingNewsletter = await Newsletter.findOne({ email: customerEmail });
+        if (!existingNewsletter) {
+          const newNewsletter = new Newsletter({ email: customerEmail });
+          const savedNewsletter = await newNewsletter.save();
+          newsletterId = savedNewsletter._id as Types.ObjectId;
+          console.log(`Cliente suscrito a newsletter: ${customerEmail}`);
+        } else {
+          newsletterId = existingNewsletter._id as Types.ObjectId;
+        }
+      } catch (newsletterError) {
+        console.error('Error suscribiendo a newsletter:', newsletterError);
+      }
+    }
+
+    if (existingClient) {
+      // Actualizar cliente existente
+      existingClient.orderIds.push(orderId);
+      existingClient.emailMarketing = emailMarketing;
+      if (newsletterId) {
+        existingClient.newsletterId = newsletterId;
+      }
+      
+      // Actualizar información de pago
+      existingClient.paymentInfo.stripeCustomerId = session.customer || existingClient.paymentInfo.stripeCustomerId;
+      existingClient.paymentInfo.lastPaymentMethod = session.payment_method_types?.[0] || existingClient.paymentInfo.lastPaymentMethod;
+      
+      await existingClient.save();
+      console.log(`Cliente actualizado: ${customerEmail}`);
+    } else {
+      // Crear nuevo cliente
+      const newClient = new Client({
+        name: customerName || 'Cliente',
+        email: customerEmail,
+        phone: phone || '',
+        address: {
+          line1: address?.line1 || '',
+          line2: address?.line2 || '',
+          city: address?.city || '',
+          state: address?.state || '',
+          postal_code: address?.postal_code || '',
+          country: address?.country || ''
+        },
+        paymentInfo: {
+          stripeCustomerId: session.customer || '',
+          lastPaymentMethod: session.payment_method_types?.[0] || ''
+        },
+        orderIds: [orderId],
+        emailMarketing: emailMarketing,
+        newsletterId: newsletterId || undefined
+      });
+
+      await newClient.save();
+      console.log(`Nuevo cliente creado: ${customerEmail}`);
+    }
+  } catch (clientError) {
+    console.error('Error guardando datos del cliente:', clientError);
+  }
+
+  // Enviar email de confirmación
   await notificationService.sendOrderConfirmationEmail(session);
 }
 

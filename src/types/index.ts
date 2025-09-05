@@ -138,6 +138,7 @@ export interface StripePaymentIntent {
 export interface CheckoutRequest {
   items: CartItem[];
   shipping_address: ShippingAddress;
+  emailMarketing?: boolean;
 }
 
 // Tipos para respuestas de API

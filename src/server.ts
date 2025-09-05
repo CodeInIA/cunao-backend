@@ -12,6 +12,7 @@ import orderRoutes from './routes/orders.js';
 import webhookRoutes from './routes/webhooks.js';
 import configRoutes from './routes/config.js';
 import contactRoutes from './routes/contact.js';
+import newsletterRoutes from './routes/newsletter.js';
 import { db } from './services/databaseService.js';
 
 dotenv.config();
@@ -57,6 +58,7 @@ app.use('/api/config', configRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 
 // Ruta de salud
 app.get('/health', (req, res) => {
