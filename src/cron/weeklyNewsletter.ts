@@ -422,6 +422,44 @@ export const addNewsletterSubscriberToDB = async (email: string): Promise<boolea
   }
 };
 
+// Función para activar todas las preferencias de marketing cuando acepta en checkout
+export const activateAllMarketingPreferences = async (email: string): Promise<boolean> => {
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Buscar si ya existe el suscriptor
+    const existingSubscriber = await Newsletter.findOne({ email: normalizedEmail });
+    
+    if (existingSubscriber) {
+      // Actualizar todas las preferencias a true
+      existingSubscriber.preferences = {
+        newsletter: true,
+        promotions: true,
+        newProducts: true
+      };
+      await existingSubscriber.save();
+      console.log(`✅ Preferencias de marketing actualizadas para: ${normalizedEmail}`);
+    } else {
+      // Crear nuevo suscriptor con todas las preferencias activadas
+      const newSubscriber = new Newsletter({
+        email: normalizedEmail,
+        preferences: {
+          newsletter: true,
+          promotions: true,
+          newProducts: true
+        }
+      });
+      await newSubscriber.save();
+      console.log(`✅ Nuevo suscriptor de marketing creado: ${normalizedEmail}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`❌ Error activando preferencias de marketing para ${email}:`, error);
+    return false;
+  }
+};
+
 // Función para envío manual de newsletter
 export const sendNewsletterManual = async (): Promise<void> => {
   console.log('📧 Enviando newsletter manual...');

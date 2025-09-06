@@ -3,6 +3,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import printifyServiceModule from '../services/printifyService.js';
 import stripeServiceModule from '../services/stripeService.js';
 import { db } from '../services/databaseService.js';
+import { activateAllMarketingPreferences } from '../cron/weeklyNewsletter.js';
 import { 
   CheckoutRequest, 
   OrderRequest, 
@@ -355,6 +356,18 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     const autoSubmit = process.env.PRINTIFY_AUTO_SUBMIT_TO_PRODUCTION === 'true';
     if (autoSubmit) {
       await printifyService.submitOrderToProduction(printifyOrder.id);
+    }
+
+    // Activar preferencias de marketing si el cliente aceptó email marketing
+    const emailMarketingAccepted = session.metadata?.email_marketing === 'true';
+    if (emailMarketingAccepted && customerDetails.email) {
+      try {
+        await activateAllMarketingPreferences(customerDetails.email);
+        console.log(`📧 Preferencias de marketing activadas para: ${customerDetails.email}`);
+      } catch (error) {
+        console.error('Error activando preferencias de marketing:', error);
+        // No fallar el pedido por este error, solo loggear
+      }
     }
 
     res.status(200).json({
