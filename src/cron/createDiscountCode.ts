@@ -48,8 +48,9 @@ const generateDiscountEmailHTML = (
   preferencesUrl: string = ''
 ) => {
   const greeting = customerName ? `¡Hola ${customerName}!` : '¡Hola cuñao!';
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  
+  // Siempre usar la URL de producción para los emails
+  const frontendUrl = process.env.FRONTEND_PRODUCTION_URL || 'https://www.cunadismoilustrado.me';
+
   return `
 <!DOCTYPE html>
 <html lang="es">
@@ -85,22 +86,22 @@ const generateDiscountEmailHTML = (
         .header {
             text-align: center;
             padding: 40px 30px 30px;
-            background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
         }
         
         .logo {
-            width: 80px;
-            height: 80px;
+            width: 160px;
+            height: 160px;
             margin: 0 auto 20px;
-            background: #fbbf24;
-            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            font-weight: bold;
-            color: #1e293b;
-            box-shadow: 0 8px 16px rgba(251, 191, 36, 0.3);
+        }
+        
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         
         .brand-name {
@@ -276,7 +277,9 @@ const generateDiscountEmailHTML = (
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">C</div>
+            <div class="logo">
+                <img src="${frontendUrl}/logo-sin-letras.png" alt="Cuñadismo Ilustrado Logo" />
+            </div>
             <div class="brand-name">Cuñadismo Ilustrado</div>
         </div>
         
@@ -362,8 +365,8 @@ async function createDiscountCode() {
       const codeInput = await question('🏷️  ¿Qué código quieres usar para este descuento? (ej: CUÑADO2025): ');
       code = codeInput.trim().toUpperCase();
       
-      if (!/^[A-Z0-9_-]{3,20}$/.test(code)) {
-        console.log('❌ El código debe tener entre 3 y 20 caracteres y solo puede contener letras, números, guiones y guiones bajos\n');
+      if (!/^[A-ZÁÉÍÓÚÑ0-9_-]{3,20}$/.test(code)) {
+        console.log('❌ El código debe tener entre 3 y 20 caracteres y solo puede contener letras (incluida Ñ), números, guiones y guiones bajos\n');
         continue;
       }
       
@@ -458,7 +461,8 @@ async function createDiscountCode() {
         subscriber.lastToken = token;
         await subscriber.save();
         
-        const preferencesUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/newsletter/preferences?email=${encodeURIComponent(subscriber.email)}&token=${token}`;
+        // Siempre usar la URL de producción para los enlaces de email
+        const preferencesUrl = `${process.env.FRONTEND_PRODUCTION_URL || 'https://www.cunadismoilustrado.me'}/newsletter/preferences?email=${encodeURIComponent(subscriber.email)}&token=${token}`;
         
         const emailHTML = generateDiscountEmailHTML(
           discountPercentage,

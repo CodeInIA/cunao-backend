@@ -120,12 +120,16 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   let appliedDiscount = null;
   if (discountCode && discountCode.trim()) {
     try {
+      console.log(`🔍 Validando código de descuento: ${discountCode.trim()}`);
       const discount = await DiscountCode.findValidCode(discountCode.trim());
       if (discount) {
         appliedDiscount = {
           code: discount.code,
           percentage: discount.discountPercentage
         };
+        console.log(`✅ Código de descuento válido: ${appliedDiscount.code} (${appliedDiscount.percentage}%)`);
+      } else {
+        console.log(`❌ Código de descuento no válido o expirado: ${discountCode.trim()}`);
       }
     } catch (error) {
       console.warn('Error validando código de descuento:', error);

@@ -146,10 +146,21 @@ class StripeService {
       // Añadir descuento si existe
       if (options?.discountCode && options?.discountPercentage) {
         try {
+          console.log(`🎟️ Creando cupón de descuento en Stripe: ${options.discountCode} (${options.discountPercentage}%)`);
+          
+          // Limpiar el código para que sea compatible con Stripe (solo letras, números, guiones y guiones bajos)
+          const cleanCode = options.discountCode
+            .normalize('NFD') // Normalizar caracteres Unicode
+            .replace(/[\u0300-\u036f]/g, '') // Remover acentos y diacríticos
+            .replace(/[ñÑ]/g, 'n') // Reemplazar ñ por n
+            .replace(/[^a-zA-Z0-9_-]/g, '') // Remover cualquier otro caracter especial
+            .toUpperCase();
+          
+          // Crear cupón de descuento en Stripe
           // Crear cupón de descuento en Stripe
           const coupon = await this.stripe.coupons.create({
-            id: `${options.discountCode}_${Date.now()}`, // ID único
-            name: `Descuento ${options.discountCode}`,
+            id: `${cleanCode}_${Date.now()}`, // ID único con código limpio
+            name: `Descuento ${options.discountCode}`, // Usar el código original en el nombre
             percent_off: options.discountPercentage,
             duration: 'once',
             max_redemptions: 1,
@@ -159,7 +170,7 @@ class StripeService {
             coupon: coupon.id
           }];
 
-          console.log(`✅ Cupón de descuento creado: ${coupon.id} (${options.discountPercentage}%)`);
+          console.log(`✅ Cupón de descuento creado: ${coupon.id} (${options.discountPercentage}%) para código ${options.discountCode}`);
         } catch (error) {
           console.warn('Error creando cupón de descuento:', error);
           // Continuar sin descuento si hay error

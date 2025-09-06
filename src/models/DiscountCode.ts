@@ -23,10 +23,10 @@ const DiscountCodeSchema: Schema = new Schema({
     trim: true,
     validate: {
       validator: function(code: string) {
-        // Validar que el código tenga al menos 3 caracteres y solo letras, números y algunos símbolos
-        return /^[A-Z0-9_-]{3,20}$/.test(code);
+        // Validar que el código tenga al menos 3 caracteres y permita letras españolas, números y algunos símbolos
+        return /^[A-ZÁÉÍÓÚÑ0-9_-]{3,20}$/.test(code);
       },
-      message: 'El código debe tener entre 3 y 20 caracteres y solo puede contener letras, números, guiones y guiones bajos'
+      message: 'El código debe tener entre 3 y 20 caracteres y solo puede contener letras (incluida Ñ), números, guiones y guiones bajos'
     }
   },
   discountPercentage: {
