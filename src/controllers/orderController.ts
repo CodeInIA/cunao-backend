@@ -268,8 +268,9 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     { 
       email_marketing: emailMarketing ? 'true' : 'false',
       discount_code: appliedDiscount?.code || '',
-      discount_percentage: appliedDiscount?.percentage?.toString() || ''
-    }, // Metadata con preferencia de email marketing y descuento
+      discount_percentage: appliedDiscount?.percentage?.toString() || '',
+      shipping_region: shippingRegion
+    }, // Metadata con preferencia de email marketing, descuento y región de envío
     stripeOptions
   );
 

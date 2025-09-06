@@ -83,18 +83,38 @@ export async function sendOrderConfirmationEmail(session: any) {
   const discountCode = session.metadata?.discount_code || '';
   const discountPercentage = session.metadata?.discount_percentage || '';
   
-  // Determinar si es envío gratuito basado en el umbral
+  const stripe = stripeService.getInstance();
+  
+  // Calcular el subtotal original (antes del descuento) para determinar el envío
+  let originalSubtotal = subtotalValue;
+  let discountAmount = 0;
+  
+  if (discountCode && discountPercentage) {
+    // Obtener información detallada de la sesión incluyendo descuentos
+    const detailedSession = await stripe.getCheckoutSession(session.id);
+    
+    if (detailedSession.total_details?.amount_discount) {
+      discountAmount = detailedSession.total_details.amount_discount / 100;
+      // El subtotal original es el subtotal actual + el descuento aplicado
+      originalSubtotal = subtotalValue + discountAmount;
+    }
+  }
+  
+  // Determinar si es envío gratuito basado en el subtotal ORIGINAL (antes del descuento)
   const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
-  const isFreeShipping = subtotalValue >= freeShippingThreshold;
+  const isFreeShipping = originalSubtotal >= freeShippingThreshold;
   
   // Calcular costo de envío real
   let shippingCost = '0';
   if (!isFreeShipping) {
-    // Si no es envío gratuito, calcular la diferencia real
-    shippingCost = ((session.amount_total - session.amount_subtotal) / 100).toFixed(2);
+    // Obtener el costo de envío de las variables de entorno según la región
+    const shippingRegion = session.metadata?.shipping_region || 'spain';
+    if (shippingRegion === 'spain') {
+      shippingCost = parseFloat(process.env.SHIPPING_COST_SPAIN || '6.99').toFixed(2);
+    } else if (shippingRegion === 'europa') {
+      shippingCost = parseFloat(process.env.SHIPPING_COST_EUROPA || '12.99').toFixed(2);
+    }
   }
-  
-  const stripe = stripeService.getInstance();
   const lineItems = await stripe.getCheckoutSessionLineItems(session.id);
 
   // Recuperar el pedido temporal usando client_reference_id
@@ -144,23 +164,12 @@ export async function sendOrderConfirmationEmail(session: any) {
 
   // Calcular el descuento aplicado si existe
   let discountSection = '';
-  if (discountCode && discountPercentage) {
-    // Obtener información detallada de la sesión incluyendo descuentos
-    const stripe = stripeService.getInstance();
-    const detailedSession = await stripe.getCheckoutSession(session.id);
-    
-    let discountAmount = 0;
-    if (detailedSession.total_details?.amount_discount) {
-      discountAmount = detailedSession.total_details.amount_discount / 100;
-    }
-    
-    if (discountAmount > 0) {
-      discountSection = `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-          <span style="color: #E2E8F0;">Código de descuento (${discountCode}):</span>
-          <span style="color: #10B981;">-${discountAmount.toFixed(2)}€</span>
-        </div>`;
-    }
+  if (discountCode && discountAmount > 0) {
+    discountSection = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span style="color: #E2E8F0;">Código de descuento (${discountCode}):</span>
+        <span style="color: #10B981;">-${discountAmount.toFixed(2)}€</span>
+      </div>`;
   }
 
   // Desglose de precios
