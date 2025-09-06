@@ -277,6 +277,37 @@ async function handleProductPublishStarted(resource: any) {
 
         await printifyService.setPublishSucceeded(productId, productId, handle);
         console.log(`Producto ${productId} guardado en DB y marcado como publicado: ${handle}`);
+
+        // Agregar automáticamente a productos semanales para email de nuevos productos
+        try {
+            const { addWeeklyProduct } = await import('../cron/weeklyNewProducts.js');
+            
+            // Preparar datos del producto para la colección semanal
+            const imageUrl = fullProduct.images?.[0]?.src || '';
+            const lowestPrice = fullProduct.variants?.reduce((min: number, variant: any) => 
+                Math.min(min, variant.price || Infinity), Infinity) || 0;
+            
+            const weeklyProductData = {
+                productId: productId,
+                title: fullProduct.title,
+                description: fullProduct.description || '',
+                imageUrl: imageUrl,
+                price: lowestPrice / 100, // Convertir de centavos a euros
+                printifyProductId: productId,
+                tags: fullProduct.tags || []
+            };
+
+            const addedToWeekly = await addWeeklyProduct(weeklyProductData);
+            
+            if (addedToWeekly) {
+                console.log(`✅ Producto ${productId} agregado automáticamente a productos semanales`);
+            } else {
+                console.warn(`⚠️ No se pudo agregar el producto ${productId} a productos semanales`);
+            }
+        } catch (weeklyError) {
+            console.error(`❌ Error agregando producto ${productId} a productos semanales:`, weeklyError);
+        }
+        
     } catch (error) {
         console.error(`Error al procesar la publicación del producto ${productId}:`, error);
         console.error('Stack trace:', error);
