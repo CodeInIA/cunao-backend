@@ -213,27 +213,60 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 .content { padding: 20px; }
                 .brand-name { font-size: 24px; }
                 .products-grid { 
-                    flex-direction: column;
-                    align-items: center;
-                    max-width: 200px;
-                    gap: 0;
+                    display: block !important;
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    padding: 0 10px;
+                    text-align: center !important;
                 }
-        .product-card {
-          width: 180px;
-          min-width: 180px;
-          margin: 0 0 11px 0; /* separación vertical en móvil (mitad) */
-        }
+                .product-card {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    min-width: 0 !important;
+                    margin: 0 0 15px 0 !important;
+                    padding: 12px !important;
+                    display: table !important;
+                    table-layout: fixed !important;
+                    flex: none !important;
+                    text-align: left !important;
+                }
+                .product-image {
+                    display: table-cell !important;
+                    width: 80px !important;
+                    height: 80px !important;
+                    vertical-align: middle !important;
+                    margin-right: 0 !important;
+                    margin-bottom: 0 !important;
+                    padding-right: 15px !important;
+                }
+                .product-title {
+                    display: table-cell !important;
+                    vertical-align: middle !important;
+                    text-align: left !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    min-height: auto !important;
+                    font-size: 16px !important;
+                    line-height: 1.3 !important;
+                    width: auto !important;
+                }
                 .cta-button { padding: 14px 28px; font-size: 15px; }
             }
             @media (max-width: 480px) {
-        .product-card {
-          width: 160px;
-          min-width: 160px;
-          margin: 0 0 9px 0; /* mitad */
-        }
+                .product-card {
+                    padding: 10px !important;
+                    margin: 0 0 12px 0 !important;
+                }
+                .product-image {
+                    width: 70px !important;
+                    height: 70px !important;
+                    padding-right: 12px !important;
+                }
+                .product-title {
+                    font-size: 15px !important;
+                }
                 .products-grid {
-                    max-width: 180px;
-                    gap: 0;
+                    padding: 0 8px;
                 }
             }
         </style>
