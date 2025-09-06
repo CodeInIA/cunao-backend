@@ -120,9 +120,10 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 flex-wrap: wrap;
                 justify-content: center;
                 align-items: flex-start;
-                gap: 20px;
+                /* Evitamos gap por compatibilidad con clientes de email */
+                gap: 0;
                 margin: 30px auto;
-                max-width: 600px;
+                max-width: 720px;
                 text-align: center;
             }
             .product-card {
@@ -138,6 +139,8 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 text-decoration: none;
                 color: inherit;
                 display: block;
+                /* Separación entre tarjetas: funciona aunque gap no sea soportado */
+                margin: 0 8px 13px 8px;
             }
             .product-card:hover {
                 border-color: #F1BF00;
@@ -160,14 +163,16 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 color: #F1BF00;
                 font-size: 15px;
                 font-weight: bold;
-                margin-bottom: 0;
+                margin: 0;
                 line-height: 1.4;
                 min-height: 42px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                display: block;
                 text-align: center;
-                padding: 0 5px;
+                width: 100%;
+                box-sizing: border-box;
+                padding: 8px 10px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
             }
             .cta-button {
                 display: inline-block;
@@ -211,20 +216,24 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                     flex-direction: column;
                     align-items: center;
                     max-width: 200px;
+                    gap: 0;
                 }
-                .product-card {
-                    width: 180px;
-                    min-width: 180px;
-                }
+        .product-card {
+          width: 180px;
+          min-width: 180px;
+          margin: 0 0 11px 0; /* separación vertical en móvil (mitad) */
+        }
                 .cta-button { padding: 14px 28px; font-size: 15px; }
             }
             @media (max-width: 480px) {
-                .product-card {
-                    width: 160px;
-                    min-width: 160px;
-                }
+        .product-card {
+          width: 160px;
+          min-width: 160px;
+          margin: 0 0 9px 0; /* mitad */
+        }
                 .products-grid {
                     max-width: 180px;
+                    gap: 0;
                 }
             }
         </style>
