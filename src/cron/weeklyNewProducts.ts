@@ -3,6 +3,18 @@ import Newsletter, { INewsletter } from '../models/Newsletter.js';
 import { sendEmail } from '../services/emailService.js';
 import { generateNewsletterToken } from '../routes/newsletter.js';
 
+// Función slugify para crear URLs amigables
+const slugify = (text: string): string => {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 -]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+};
+
 interface NewProductsSubscriber {
   email: string;
   preferences: {
@@ -104,13 +116,14 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 line-height: 1.6;
             }
             .products-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: flex-start;
                 gap: 20px;
-                margin: 30px 0;
-                max-width: 500px;
-                margin-left: auto;
-                margin-right: auto;
+                margin: 30px auto;
+                max-width: 600px;
+                text-align: center;
             }
             .product-card {
                 background: #334155;
@@ -119,29 +132,42 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 text-align: center;
                 border: 2px solid #475569;
                 transition: all 0.3s ease;
+                flex: 0 0 auto;
+                width: 180px;
+                min-width: 160px;
+                text-decoration: none;
+                color: inherit;
+                display: block;
             }
             .product-card:hover {
                 border-color: #F1BF00;
                 transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(241, 191, 0, 0.3);
+                text-decoration: none;
+                color: inherit;
             }
             .product-image {
                 width: 100%;
-                height: 120px;
-                object-fit: cover;
+                height: 160px;
+                object-fit: contain;
                 border-radius: 8px;
-                margin-bottom: 10px;
+                margin-bottom: 12px;
+                background: #ffffff;
+                padding: 8px;
+                display: block;
             }
             .product-title {
                 color: #F1BF00;
-                font-size: 14px;
+                font-size: 15px;
                 font-weight: bold;
-                margin-bottom: 5px;
-                line-height: 1.3;
-            }
-            .product-price {
-                color: #94a3b8;
-                font-size: 13px;
-                font-weight: 600;
+                margin-bottom: 0;
+                line-height: 1.4;
+                min-height: 42px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                padding: 0 5px;
             }
             .cta-button {
                 display: inline-block;
@@ -181,8 +207,25 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 .header { padding: 30px 20px 20px 20px; }
                 .content { padding: 20px; }
                 .brand-name { font-size: 24px; }
-                .products-grid { grid-template-columns: 1fr; }
+                .products-grid { 
+                    flex-direction: column;
+                    align-items: center;
+                    max-width: 200px;
+                }
+                .product-card {
+                    width: 180px;
+                    min-width: 180px;
+                }
                 .cta-button { padding: 14px 28px; font-size: 15px; }
+            }
+            @media (max-width: 480px) {
+                .product-card {
+                    width: 160px;
+                    min-width: 160px;
+                }
+                .products-grid {
+                    max-width: 180px;
+                }
             }
         </style>
     </head>
@@ -207,11 +250,10 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 <!-- Products Grid -->
                 <div class="products-grid">
                     ${featuredProducts.map(product => `
-                        <div class="product-card">
+                        <a href="${config.frontend.url}/producto/${slugify(product.title)}" class="product-card">
                             <img src="${product.imageUrl}" alt="${product.title}" class="product-image" />
                             <div class="product-title">${product.title}</div>
-                            <div class="product-price">${product.price}€</div>
-                        </div>
+                        </a>
                     `).join('')}
                 </div>
                 
