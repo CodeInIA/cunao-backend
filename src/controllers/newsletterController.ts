@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import Newsletter from '../models/Newsletter.js';
 import { ApiResponse } from '../types';
-import { sendNewsletterManual, addNewsletterSubscriber } from '../cron/weeklyNewsletter.js';
+import { sendNewsletterManual, addNewsletterSubscriberToDB } from '../cron/weeklyNewsletter.js';
 
 interface NewsletterSubscriptionData {
   email: string;
@@ -159,7 +159,7 @@ export const addTestSubscriber = asyncHandler(async (req: Request, res: Response
   }
   
   try {
-    addNewsletterSubscriber(email, preferences);
+    addNewsletterSubscriberToDB(email);
     
     const response: ApiResponse<any> = {
       success: true,
