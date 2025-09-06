@@ -238,6 +238,9 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                     margin-right: 0 !important;
                     margin-bottom: 0 !important;
                     padding-right: 15px !important;
+                    background: transparent !important;
+                    border-radius: 8px !important;
+                    object-fit: contain !important;
                 }
                 .product-title {
                     display: table-cell !important;
@@ -261,6 +264,7 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                     width: 70px !important;
                     height: 70px !important;
                     padding-right: 12px !important;
+                    background: transparent !important;
                 }
                 .product-title {
                     font-size: 15px !important;
