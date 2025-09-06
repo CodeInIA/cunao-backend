@@ -358,11 +358,13 @@ export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
     
     console.log(`📧 Email de nuevos productos completado: ${emailsSent} enviados, ${emailsFailed} fallidos`);
     
-    // Opcional: Marcar productos como enviados (agregar campo emailSent)
-    await WeeklyProduct.updateMany(
-      { weekYear: currentWeek },
-      { $set: { emailSent: true, emailSentAt: new Date() } }
-    );
+    // Después de enviar todos los emails, vaciar la colección de productos semanales
+    try {
+      const deleteResult = await WeeklyProduct.deleteMany({ weekYear: currentWeek });
+      console.log(`🗑️ Colección de productos semanales vaciada: ${deleteResult.deletedCount} productos eliminados de la semana ${currentWeek}`);
+    } catch (deleteError) {
+      console.error('❌ Error vaciando la colección de productos semanales:', deleteError);
+    }
     
   } catch (error) {
     console.error('❌ Error en envío de email de nuevos productos:', error);
