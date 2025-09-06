@@ -38,37 +38,53 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
     });
   }
 
-  // Calcular total del carrito
+  // Recalcular precios en servidor (no confiar en item.price del cliente)
+  const printifyService = printifyServiceModule.getInstance();
+  const printifyProducts = await Promise.all(items.map(i => printifyService.getProduct(i.productId)));
+
+  const secureItems = items.map((item, idx) => {
+    const product = printifyProducts[idx];
+    if (!product) throw new Error(`Producto con ID ${item.productId} no encontrado.`);
+    const variant = product.variants.find(v => v.id === item.variantId);
+    if (!variant || typeof variant.id === 'undefined') {
+      throw new Error(`Variante con ID ${item.variantId} no válida para el producto ${item.productId}.`);
+    }
+    return {
+      productId: product.id,
+      variantId: variant.id,
+      quantity: item.quantity,
+      price: variant.price / 100,
+    };
+  });
+
   const stripeService = stripeServiceModule.getInstance();
-  const total = stripeService.calculateCartTotal(items);
-  
-  // Obtener costos de envío de Printify
-  const line_items = items.map(item => ({
-    product_id: item.productId,
-    variant_id: item.variantId,
-    quantity: item.quantity
+  const itemsTotal = secureItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+
+  // Obtener costos de envío de Printify (ya existente en este endpoint)
+  const line_items = secureItems.map(i => ({
+    product_id: i.productId,
+    variant_id: i.variantId,
+    quantity: i.quantity
   }));
 
   let shippingCost = 0;
   try {
-    const printifyService = printifyServiceModule.getInstance();
     const shippingOptions = await printifyService.getShippingCosts(line_items, shipping_address);
     if (shippingOptions.length > 0) {
-      shippingCost = shippingOptions[0].cost / 100; // Convertir de céntimos
+      shippingCost = shippingOptions[0].cost / 100;
     }
   } catch (error) {
     console.warn('No se pudieron obtener costos de envío, usando valor por defecto');
-    shippingCost = 5.99; // Costo por defecto
+    shippingCost = 5.99;
   }
 
-  const totalWithShipping = total + shippingCost;
+  const totalWithShipping = itemsTotal + shippingCost;
 
-  // Crear Payment Intent en Stripe
   const paymentIntent = await stripeService.createPaymentIntent(
     totalWithShipping,
     'eur',
     {
-      items: JSON.stringify(items),
+      items: JSON.stringify(secureItems),
       shipping_address: JSON.stringify(shipping_address),
       shipping_cost: shippingCost.toString()
     }
@@ -80,7 +96,7 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
       client_secret: paymentIntent.client_secret,
       total: totalWithShipping,
       shipping_cost: shippingCost,
-      items_total: total
+      items_total: itemsTotal
     }
   };
 
@@ -246,22 +262,19 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       return res.status(400).json({ success: false, error: 'El pago no ha sido completado' });
     }
 
-    // --- INICIO DE LA CORRECCIÓN BASADA EN TU CAPTURA ---
-    // Accedemos a los detalles del cliente, que contienen la dirección
     const customerDetails = session.customer_details;
-
-    // Verificamos que tanto los detalles del cliente como la dirección existen
     if (!customerDetails || !customerDetails.address) {
       throw new Error('No se encontraron los detalles de envío del cliente en la sesión de Stripe.');
     }
+
     const shippingAddress = customerDetails.address;
-    // --- FIN DE LA CORRECCIÓN ---
     
     // Recuperar el pedido temporal usando el client_reference_id
     const orderId = session.client_reference_id;
     if (!orderId) {
       throw new Error('No se recibió client_reference_id en la sesión de Stripe.');
     }
+
     let order = await db.findOrderByIdAndUpdate(orderId, {
       stripeSessionId: session.id,
       customerEmail: customerDetails.email || '',
@@ -276,8 +289,30 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       totalAmount: session.amount_total ? session.amount_total / 100 : 0,
       status: 'processing'
     });
+
     if (!order) {
       throw new Error('No se encontró el pedido temporal en la base de datos por client_reference_id.');
+    }
+
+    // Idempotencia: si ya fue enviado a Printify, no duplicar
+    if (order.printifyOrderId) {
+      return res.status(200).json({
+        success: true,
+        data: { order_id: order.printifyOrderId, status: 'processing' },
+        message: 'Pedido ya procesado anteriormente'
+      });
+    }
+
+    // Validación defensiva de región vs país (no bloquea si envío gratis)
+    const expectedRegion = order.region; // guardado al crear la sesión
+    const actualRegion = shippingAddress.country === 'ES' ? 'spain' : 'europa';
+    const shippingCharged = (session.amount_total || 0) - (session.amount_subtotal || 0);
+
+    if (expectedRegion && expectedRegion !== actualRegion && shippingCharged > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'La región de envío seleccionada no coincide con el país de la dirección proporcionada.'
+      });
     }
 
     // Validar que el pedido tiene productos
@@ -336,6 +371,8 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
 
 
 // Obtener estado de un pedido
+// NOTA DE SEGURIDAD: Este endpoint expone información del pedido sin autenticación.
+// En producción, considerar añadir autenticación o al menos ofuscar IDs sensibles.
 export const getOrderStatus = asyncHandler(async (req: Request, res: Response) => {
   const { orderId } = req.params;
   

@@ -94,14 +94,14 @@ class StripeService {
           shippingOption = {
             display_name: 'España (Envío Estándar)',
             amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_SPAIN || '5.99') * 100),
-            allowed_countries: ['ES']
+            allowed_countries: ['ES'] as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[]
           };
           break;
         case 'europa':
           shippingOption = {
             display_name: 'Resto de Europa (UE)',
             amount: isFreeShipping ? 0 : Math.round(parseFloat(process.env.SHIPPING_COST_EUROPA || '12.99') * 100),
-            allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT'] // Ejemplo
+            allowed_countries: ['FR', 'DE', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'LU', 'AT'] as Stripe.Checkout.SessionCreateParams.ShippingAddressCollection.AllowedCountry[]
           };
           break;
         default:
@@ -115,8 +115,9 @@ class StripeService {
         success_url: successUrl,
         cancel_url: cancelUrl,
         metadata,
+        client_reference_id: clientReferenceId,
         shipping_address_collection: {
-          allowed_countries: shippingOption.allowed_countries,
+          allowed_countries: shippingOption.allowed_countries
         },
         phone_number_collection: {
           enabled: true
@@ -135,9 +136,6 @@ class StripeService {
         ],
         billing_address_collection: 'required'
       };
-      if (clientReferenceId) {
-        sessionParams.client_reference_id = clientReferenceId;
-      }
 
       const session = await this.stripe.checkout.sessions.create(sessionParams);
       return session;
