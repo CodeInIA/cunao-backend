@@ -79,6 +79,10 @@ export async function sendOrderConfirmationEmail(session: any) {
   const subtotal = (session.amount_subtotal / 100).toFixed(2);
   const subtotalValue = parseFloat(subtotal);
   
+  // Obtener información del descuento desde metadata
+  const discountCode = session.metadata?.discount_code || '';
+  const discountPercentage = session.metadata?.discount_percentage || '';
+  
   // Determinar si es envío gratuito basado en el umbral
   const freeShippingThreshold = parseFloat(process.env.FREE_SHIPPING_THRESHOLD || '85');
   const isFreeShipping = subtotalValue >= freeShippingThreshold;
@@ -138,6 +142,27 @@ export async function sendOrderConfirmationEmail(session: any) {
   }
   itemsHtml += '</div>';
 
+  // Calcular el descuento aplicado si existe
+  let discountSection = '';
+  if (discountCode && discountPercentage) {
+    // Obtener información detallada de la sesión incluyendo descuentos
+    const stripe = stripeService.getInstance();
+    const detailedSession = await stripe.getCheckoutSession(session.id);
+    
+    let discountAmount = 0;
+    if (detailedSession.total_details?.amount_discount) {
+      discountAmount = detailedSession.total_details.amount_discount / 100;
+    }
+    
+    if (discountAmount > 0) {
+      discountSection = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: #E2E8F0;">Código de descuento (${discountCode}):</span>
+          <span style="color: #10B981;">-${discountAmount.toFixed(2)}€</span>
+        </div>`;
+    }
+  }
+
   // Desglose de precios
   const priceBreakdown = `
     <div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 20px;">
@@ -149,6 +174,7 @@ export async function sendOrderConfirmationEmail(session: any) {
         <span style="color: #E2E8F0;">Envío:</span>
         <span style="color: #E2E8F0;">${parseFloat(shippingCost) === 0 ? 'GRATIS' : shippingCost + '€'}</span>
       </div>
+      ${discountSection}
       <hr style="border: none; border-top: 1px solid #475569; margin: 12px 0;">
       <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: bold;">
         <span style="color: #FFFFFF;">Total:</span>
