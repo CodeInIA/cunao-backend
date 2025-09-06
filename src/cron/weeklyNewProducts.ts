@@ -384,13 +384,26 @@ export const addWeeklyProduct = async (productData: {
   try {
     const currentWeek = getWeekYear();
     
-    // Verificar si ya existe
+    // Verificar si ya existe el producto
     const existingProduct = await WeeklyProduct.findOne({ 
       productId: productData.productId 
     });
     
     if (existingProduct) {
-      console.log(`📦 Producto ${productData.productId} ya existe en productos semanales`);
+      // Actualizar producto existente con la nueva información
+      const updateData = {
+        ...productData,
+        weekYear: currentWeek,
+        tags: productData.tags || [],
+        publishedAt: new Date() // Actualizar fecha de publicación
+      };
+      
+      await WeeklyProduct.updateOne(
+        { productId: productData.productId },
+        { $set: updateData }
+      );
+      
+      console.log(`🔄 Producto actualizado en productos semanales: ${productData.title} (Semana: ${currentWeek})`);
       return true;
     }
 
