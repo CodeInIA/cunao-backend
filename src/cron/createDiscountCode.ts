@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 
+console.log('🔥 Script iniciado - cargando módulos...');
+
 import readline from 'readline';
 import mongoose from 'mongoose';
-import DiscountCode from '../models/DiscountCode.js';
-import Newsletter from '../models/Newsletter.js';
-import { sendEmail } from '../services/emailService.js';
-import { generateNewsletterToken } from '../routes/newsletter.js';
+import DiscountCode from '../models/DiscountCode';
+import Newsletter from '../models/Newsletter';
+import { sendEmail } from '../services/emailService';
+import { generateNewsletterToken } from '../routes/newsletter';
 import dotenv from 'dotenv';
+
+console.log('📦 Módulos cargados correctamente');
 
 // Cargar variables de entorno
 dotenv.config();
@@ -16,6 +20,17 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
+
+// Manejar señales de interrupción para cerrar correctamente
+const cleanup = async () => {
+  console.log('\n🛑 Operación cancelada por el usuario');
+  rl.close();
+  await mongoose.disconnect();
+  process.exit(0);
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 // Función para hacer preguntas
 const question = (prompt: string): Promise<string> => {
@@ -314,15 +329,18 @@ const generateDiscountEmailHTML = (
 
 // Función principal del script
 async function createDiscountCode() {
+  console.log('🚀 Iniciando script de creación de códigos de descuento...');
+  
   try {
     console.log('\n🎯 === CREADOR DE CÓDIGOS DE DESCUENTO === 🎯\n');
     
     // Conectar a MongoDB
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI no está configurado en las variables de entorno');
+    console.log('🔌 Intentando conectar a MongoDB...');
+    if (!process.env.MONGO_URI) {
+      throw new Error('MONGO_URI no está configurado en las variables de entorno');
     }
     
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Conectado a MongoDB\n');
     
     // 1. Pedir porcentaje de descuento
@@ -398,8 +416,6 @@ async function createDiscountCode() {
     const confirmation = await question('✅ ¿Los datos son correctos? (yes/no): ');
     if (confirmation.toLowerCase() !== 'yes' && confirmation.toLowerCase() !== 'y' && confirmation.toLowerCase() !== 'si' && confirmation.toLowerCase() !== 's') {
       console.log('❌ Operación cancelada');
-      rl.close();
-      await mongoose.disconnect();
       return;
     }
     
@@ -425,8 +441,6 @@ async function createDiscountCode() {
     
     if (subscribers.length === 0) {
       console.log('ℹ️  No hay clientes con promociones activadas. El código se ha creado pero no se enviará ningún email.');
-      rl.close();
-      await mongoose.disconnect();
       return;
     }
     
@@ -486,8 +500,7 @@ async function createDiscountCode() {
 }
 
 // Ejecutar el script
-if (import.meta.url === `file://${process.argv[1]}`) {
-  createDiscountCode();
-}
+console.log('🎬 Ejecutando función principal...');
+createDiscountCode();
 
 export { createDiscountCode };

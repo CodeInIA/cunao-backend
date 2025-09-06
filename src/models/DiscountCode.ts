@@ -60,8 +60,7 @@ const DiscountCodeSchema: Schema = new Schema({
   timestamps: true
 });
 
-// Índice para búsquedas rápidas por código
-DiscountCodeSchema.index({ code: 1 });
+// El índice único se crea automáticamente por la propiedad "unique: true" en el campo code
 
 // Método para verificar si el código está vigente
 DiscountCodeSchema.methods.isValid = function(): boolean {
