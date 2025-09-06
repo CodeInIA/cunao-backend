@@ -84,11 +84,28 @@ export const subscribeToNewsletter = asyncHandler(async (req: Request, res: Resp
     const existingSubscription = await Newsletter.findOne({ email: email.toLowerCase().trim() });
     
     if (existingSubscription) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: 'Este email ya está suscrito a nuestra newsletter'
-      };
-      return res.status(409).json(response);
+      // Si el usuario ya tiene newsletter activado, no puede volver a suscribirse
+      if (existingSubscription.preferences?.newsletter === true) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'Este email ya está suscrito a nuestra newsletter'
+        };
+        return res.status(409).json(response);
+      }
+      
+      // Si newsletter está en false, permitir re-suscripción
+      if (existingSubscription.preferences?.newsletter === false) {
+        existingSubscription.preferences.newsletter = true;
+        await existingSubscription.save();
+        
+        console.log(`✅ Usuario re-suscrito al newsletter: ${email}`);
+        
+        const response: ApiResponse<{ message: string }> = {
+          success: true,
+          data: { message: 'Te has vuelto a suscribir correctamente al newsletter' }
+        };
+        return res.status(200).json(response);
+      }
     }
 
     // Crear nueva suscripción con preferencias por defecto

@@ -437,13 +437,13 @@ export const startNewsletterScheduler = (): void => {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
   if (isDevelopment) {
-    // Cada 1 minuto en desarrollo
+    // Cada 15 minutos en desarrollo
     setInterval(async () => {
       console.log('📧 [DEV] Enviando newsletter de prueba...');
       await sendWeeklyNewsletter();
-    }, 1 * 60 * 1000); // 1 minuto
-    
-    console.log('🕒 Newsletter scheduler configurado para desarrollo (cada 1 minuto)');
+    }, 15 * 60 * 1000); // 15 minutos
+
+    console.log('🕒 Newsletter scheduler configurado para desarrollo (cada 15 minutos)');
   } else {
     // Cada sábado a las 18:00 en producción
     setInterval(async () => {
