@@ -13,6 +13,7 @@ import configRoutes from './routes/config.js';
 import contactRoutes from './routes/contact.js';
 import newsletterRoutes from './routes/newsletter.js';
 import weeklyProductsRoutes from './routes/weeklyProducts.js';
+import discountRoutes from './routes/discounts.js';
 import { db } from './services/databaseService.js';
 import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
@@ -62,6 +63,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/weekly-products', weeklyProductsRoutes);
+app.use('/api/discounts', discountRoutes);
 
 // Ruta de salud
 app.get('/health', (req, res) => {

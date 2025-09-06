@@ -72,7 +72,13 @@ class StripeService {
     successUrl: string,
     cancelUrl: string,
     metadata: Record<string, string> = {},
-    options?: { shippingRegion?: string; client_reference_id?: string; subtotal?: number }
+    options?: { 
+      shippingRegion?: string; 
+      client_reference_id?: string; 
+      subtotal?: number;
+      discountCode?: string;
+      discountPercentage?: number;
+    }
   ): Promise<Stripe.Checkout.Session> {
     try {
       const shippingRegion = options?.shippingRegion || '';
@@ -136,6 +142,29 @@ class StripeService {
         ],
         billing_address_collection: 'required'
       };
+
+      // Añadir descuento si existe
+      if (options?.discountCode && options?.discountPercentage) {
+        try {
+          // Crear cupón de descuento en Stripe
+          const coupon = await this.stripe.coupons.create({
+            id: `${options.discountCode}_${Date.now()}`, // ID único
+            name: `Descuento ${options.discountCode}`,
+            percent_off: options.discountPercentage,
+            duration: 'once',
+            max_redemptions: 1,
+          });
+
+          sessionParams.discounts = [{
+            coupon: coupon.id
+          }];
+
+          console.log(`✅ Cupón de descuento creado: ${coupon.id} (${options.discountPercentage}%)`);
+        } catch (error) {
+          console.warn('Error creando cupón de descuento:', error);
+          // Continuar sin descuento si hay error
+        }
+      }
 
       const session = await this.stripe.checkout.sessions.create(sessionParams);
       return session;

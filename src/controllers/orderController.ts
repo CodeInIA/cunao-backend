@@ -4,6 +4,7 @@ import printifyServiceModule from '../services/printifyService.js';
 import stripeServiceModule from '../services/stripeService.js';
 import { db } from '../services/databaseService.js';
 import { activateAllMarketingPreferences } from '../cron/weeklyNewsletter.js';
+import DiscountCode from '../models/DiscountCode.js';
 import { 
   CheckoutRequest, 
   OrderRequest, 
@@ -106,13 +107,30 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
 
 // Crear sesión de checkout
 export const createCheckoutSession = asyncHandler(async (req: Request, res: Response) => {
-  const { items, shippingRegion, emailMarketing } = req.body;
+  const { items, shippingRegion, emailMarketing, discountCode } = req.body;
   
   if (!items || !items.length) {
     return res.status(400).json({ success: false, error: 'El carrito está vacío' });
   }
   if (!shippingRegion) {
     return res.status(400).json({ success: false, error: 'La región de envío es obligatoria' });
+  }
+
+  // Validar código de descuento si se proporciona
+  let appliedDiscount = null;
+  if (discountCode && discountCode.trim()) {
+    try {
+      const discount = await DiscountCode.findValidCode(discountCode.trim());
+      if (discount) {
+        appliedDiscount = {
+          code: discount.code,
+          percentage: discount.discountPercentage
+        };
+      }
+    } catch (error) {
+      console.warn('Error validando código de descuento:', error);
+      // No fallar por error de descuento, solo continuar sin descuento
+    }
   }
 
 
@@ -225,18 +243,30 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   // Tipar el _id correctamente
   // Usar el ID temporal del pedido como client_reference_id
   const tempOrderId = tempOrder?._id ? String(tempOrder._id) : '';
+  
+  // Preparar opciones para Stripe
+  const stripeOptions: any = {
+    shippingRegion,
+    client_reference_id: tempOrderId,
+    subtotal: subtotal
+  };
+
+  // Añadir descuento si existe
+  if (appliedDiscount) {
+    stripeOptions.discountCode = appliedDiscount.code;
+    stripeOptions.discountPercentage = appliedDiscount.percentage;
+  }
+
   const session = await stripeService.createCheckoutSession(
     lineItemsForStripe,
     successUrl,
     cancelUrl,
     { 
-      email_marketing: emailMarketing ? 'true' : 'false'
-    }, // Metadata con preferencia de email marketing
-    {
-      shippingRegion,
-      client_reference_id: tempOrderId,
-      subtotal: subtotal
-    }
+      email_marketing: emailMarketing ? 'true' : 'false',
+      discount_code: appliedDiscount?.code || '',
+      discount_percentage: appliedDiscount?.percentage?.toString() || ''
+    }, // Metadata con preferencia de email marketing y descuento
+    stripeOptions
   );
 
   // Actualizar el pedido temporal con el sessionId de Stripe
