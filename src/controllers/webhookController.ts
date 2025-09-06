@@ -283,16 +283,31 @@ async function handleProductPublishStarted(resource: any) {
             const { addWeeklyProduct } = await import('../cron/weeklyNewProducts.js');
             
             // Preparar datos del producto para la colección semanal
-            const imageUrl = fullProduct.images?.[0]?.src || '';
-            const lowestPrice = fullProduct.variants?.reduce((min: number, variant: any) => 
-                Math.min(min, variant.price || Infinity), Infinity) || 0;
+            const enabledVariants = fullProduct.variants?.filter((v: any) => v.is_enabled) || [];
+            
+            // Encontrar la imagen por defecto
+            const defaultImage = fullProduct.images?.find((img: any) => img.is_default) || fullProduct.images?.[0];
+            const imageUrl = defaultImage?.src || '';
+            
+            // Encontrar la variante que corresponde a la imagen por defecto
+            let selectedVariant = enabledVariants[0]; // fallback
+            if (defaultImage?.variant_ids && defaultImage.variant_ids.length > 0) {
+                const imageVariantId = defaultImage.variant_ids[0];
+                const imageVariant = enabledVariants.find((v: any) => v.id === imageVariantId);
+                if (imageVariant) {
+                    selectedVariant = imageVariant;
+                }
+            }
+            
+            // Usar el precio de la variante seleccionada o el precio mínimo como fallback
+            const priceToUse = selectedVariant?.price || Math.min(...enabledVariants.map((v: any) => v.price || Infinity));
             
             const weeklyProductData = {
                 productId: productId,
                 title: fullProduct.title,
                 description: fullProduct.description || '',
                 imageUrl: imageUrl,
-                price: lowestPrice / 100, // Convertir de centavos a euros
+                price: priceToUse / 100, // Convertir de centavos a euros
                 printifyProductId: productId,
                 tags: fullProduct.tags || []
             };
