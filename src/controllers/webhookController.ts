@@ -328,15 +328,63 @@ async function handleProductPublishStarted(resource: any) {
             console.log(`✅ Procesamiento de imágenes completado: ${syncResult.processedImages.length}/${fullProduct.images.length} imágenes optimizadas`);
         }
 
-        // Ejecutar limpieza de imágenes huérfanas siempre que el producto ya exista
-        // Esto es importante para eliminar imágenes de colores/variantes que ya no existen
-        if (existingProduct) {
-            console.log(`🧹 Limpiando imágenes huérfanas del producto ${productId}`);
-            const cleanupResult = await imageService.cleanupOrphanedImages(productId, fullProduct.images);
-            if (cleanupResult.cleanedCount > 0) {
-                console.log(`✅ ${cleanupResult.cleanedCount} imágenes huérfanas eliminadas`);
-            } else {
-                console.log(`✨ No se encontraron imágenes huérfanas para eliminar`);
+        // Si el producto ya existe, hacer sincronización inteligente de imágenes
+        if (existingProduct && existingProduct.images) {
+            console.log(`🔄 Sincronizando imágenes del producto existente ${productId}`);
+            
+            // Crear mapas para comparación eficiente
+            const printifyImageUrls = new Set(fullProduct.images.map(img => img.src));
+            const dbImages = existingProduct.images || [];
+            const dbImageUrls = new Set(dbImages.map(img => img.src));
+            
+            // Encontrar imágenes que están en DB pero no en Printify (para eliminar)
+            const imagesToRemove = dbImages.filter(dbImg => !printifyImageUrls.has(dbImg.src));
+            
+            // Encontrar imágenes que están en Printify pero no en DB (para añadir)
+            const imagesToAdd = fullProduct.images.filter(printifyImg => !dbImageUrls.has(printifyImg.src));
+            
+            console.log(`📊 Análisis de sincronización:`, {
+                enDB: dbImages.length,
+                enPrintify: fullProduct.images.length,
+                paraEliminar: imagesToRemove.length,
+                paraAñadir: imagesToAdd.length
+            });
+            
+            // Eliminar imágenes que ya no están en Printify
+            if (imagesToRemove.length > 0) {
+                console.log(`🗑️ Eliminando ${imagesToRemove.length} imágenes que ya no están en Printify`);
+                
+                const publicIdsToDelete = imagesToRemove
+                    .filter(img => img.cdnPublicId)
+                    .map(img => img.cdnPublicId)
+                    .filter((id): id is string => typeof id === 'string');
+                
+                if (publicIdsToDelete.length > 0) {
+                    try {
+                        await imageService.deleteImages(publicIdsToDelete);
+                        console.log(`✅ ${publicIdsToDelete.length} imágenes eliminadas del CDN`);
+                    } catch (error) {
+                        console.error(`❌ Error eliminando imágenes del CDN:`, error);
+                    }
+                }
+            }
+            
+            // Procesar nuevas imágenes de Printify si las hay
+            if (imagesToAdd.length > 0) {
+                console.log(`📥 Procesando ${imagesToAdd.length} nuevas imágenes de Printify`);
+                
+                try {
+                    const syncResult = await imageService.processProductImagesSync(productId, imagesToAdd);
+                    console.log(`✅ Nuevas imágenes procesadas: ${syncResult.processedImages.length}/${imagesToAdd.length}`);
+                } catch (error) {
+                    console.error(`❌ Error procesando nuevas imágenes:`, error);
+                }
+            }
+            
+            // Si estamos reutilizando imágenes existentes, mantener las que siguen válidas
+            if (processedImages.length > 0) {
+                // Filtrar solo las imágenes que siguen siendo válidas según Printify
+                processedImages = processedImages.filter(img => printifyImageUrls.has(img.src));
             }
         }
 
