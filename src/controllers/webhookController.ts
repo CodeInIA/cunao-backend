@@ -10,6 +10,7 @@ import { db } from '../services/databaseService.js';
 import { PrintifyProduct } from '../types/index.js';
 import Client from '../models/Client.js';
 import Newsletter from '../models/Newsletter.js';
+import WeeklyProduct from '../models/WeeklyProducts.js';
 
 // --- Función slugify ---
 function slugify(text: string): string {
@@ -258,8 +259,52 @@ async function handleProductPublishStarted(resource: any) {
         // Verificar si el producto ya existe en la base de datos
         const existingProduct = await db.getProductByPrintifyId(productId);
         
-        // Obtener la información completa actualizada del producto desde Printify
-        const fullProduct = await printifyService.getProduct(productId);
+        // Intentar obtener la información completa actualizada del producto desde Printify
+        let fullProduct;
+        try {
+            fullProduct = await printifyService.getProduct(productId);
+        } catch (error: any) {
+            // Si el producto no existe en Printify (404), probablemente fue eliminado
+            if (error.response?.status === 404) {
+                console.log(`📋 Producto ${productId} no encontrado en Printify (posiblemente eliminado)`);
+                
+                if (existingProduct) {
+                    console.log(`📋 Producto ${productId} encontrado en base de datos, eliminando recursos`);
+                    
+                    // Eliminar todas las imágenes del producto del CDN
+                    if (existingProduct.images && existingProduct.images.length > 0) {
+                        console.log(`🗑️ Eliminando todas las imágenes del producto ${productId} del CDN`);
+                        
+                        try {
+                            const deleteResult = await imageService.deleteProductImages(productId);
+                            console.log(`�️ ${deleteResult.deletedCount} imágenes eliminadas del CDN`);
+                            
+                            if (deleteResult.errors.length > 0) {
+                                console.warn(`⚠️ Se encontraron errores durante la eliminación:`, deleteResult.errors);
+                            }
+                        } catch (deleteError) {
+                            console.error(`❌ Error eliminando imágenes del CDN:`, deleteError);
+                        }
+                    }
+                    
+                    // Eliminar el producto de la base de datos
+                    try {
+                        await db.deleteProductByPrintifyId(productId);
+                        console.log(`Producto ${productId} eliminado de la base de datos.`);
+                        console.log(`✅ Producto ${productId} eliminado exitosamente de la base de datos y CDN`);
+                    } catch (dbError) {
+                        console.error(`❌ Error eliminando producto ${productId} de la base de datos:`, dbError);
+                    }
+                } else {
+                    console.log(`📋 Producto ${productId} no encontrado en base de datos, no se requiere limpieza`);
+                }
+                
+                return; // Terminar aquí ya que el producto fue eliminado
+            } else {
+                // Cualquier otro error, re-lanzar
+                throw error;
+            }
+        }
         
         if (!fullProduct) {
             console.error(`No se pudo obtener el producto ${productId} de Printify`);
@@ -525,6 +570,18 @@ async function handleProductDeleted(resource: any) {
         // Eliminar el producto de la base de datos
         const deleted = await db.deleteProductByPrintifyId(productId);
         if (deleted) {
+            // También eliminar de la colección de productos semanales si existe
+            try {
+                const weeklyDeleteResult = await WeeklyProduct.deleteMany({ printifyProductId: productId });
+                if (weeklyDeleteResult.deletedCount > 0) {
+                    console.log(`📅 Producto ${productId} eliminado de ${weeklyDeleteResult.deletedCount} entrada(s) de productos semanales`);
+                } else {
+                    console.log(`📅 Producto ${productId} no se encontró en productos semanales`);
+                }
+            } catch (weeklyError) {
+                console.error(`❌ Error eliminando producto ${productId} de productos semanales:`, weeklyError);
+            }
+            
             console.log(`✅ Producto ${productId} eliminado exitosamente de la base de datos y CDN`);
         } else {
             console.log(`📋 El producto ${productId} no se encontró en la base de datos`);
