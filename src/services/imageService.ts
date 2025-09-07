@@ -20,6 +20,35 @@ interface ProcessedImage {
 
 class ImageService {
   /**
+   * Verifica si una imagen ya existe en el CDN basándose en su URL original
+   */
+  async checkImageExists(originalUrl: string, productId: string): Promise<string | null> {
+    try {
+      // Generar el hash de la URL para crear un public_id consistente
+      const crypto = require('crypto');
+      const urlHash = crypto.createHash('md5').update(originalUrl).digest('hex');
+      const publicId = `cunao/products/${productId}/image_${urlHash}`;
+
+      // Verificar si la imagen existe en Cloudinary
+      const result = await cloudinary.api.resource(publicId);
+      
+      if (result && result.secure_url) {
+        console.log(`✅ Imagen ya existe en CDN: ${result.secure_url}`);
+        return result.secure_url;
+      }
+    } catch (error: any) {
+      // Si el error es "Not Found", la imagen no existe, que es lo esperado
+      if (error.http_code === 404) {
+        console.log(`📋 Imagen no existe en CDN, se procesará: ${originalUrl}`);
+        return null;
+      }
+      console.warn(`⚠️ Error verificando imagen en CDN: ${error.message}`);
+    }
+    
+    return null;
+  }
+
+  /**
    * Procesa una imagen: la descarga, convierte a WebP y sube a Cloudinary
    */
   async processImage(
@@ -32,6 +61,28 @@ class ImageService {
   ): Promise<ProcessedImage | null> {
     try {
       console.log(`Procesando imagen ${imageIndex} del producto ${productId}: ${imageUrl}`);
+
+      // Primero verificar si la imagen ya existe en el CDN
+      const existingCdnUrl = await this.checkImageExists(imageUrl, productId);
+      if (existingCdnUrl) {
+        console.log(`🔄 Reutilizando imagen existente del CDN`);
+        
+        // Extraer el public_id de la URL existente
+        const publicIdMatch = existingCdnUrl.match(/\/v\d+\/(.+)\.[^.]+$/);
+        const publicId = publicIdMatch ? publicIdMatch[1] : `cunao/products/${productId}/image_${imageIndex}`;
+        
+        return {
+          originalUrl: imageUrl,
+          cdnUrl: existingCdnUrl,
+          publicId,
+          variantIds,
+          position,
+          isDefault,
+        };
+      }
+
+      // Si no existe, proceder con el procesamiento normal
+      console.log(`📸 Procesando nueva imagen: ${imageUrl}`);
 
       // Descargar la imagen
       const response = await axios.get(imageUrl, {
@@ -49,8 +100,10 @@ class ImageService {
         })
         .toBuffer();
 
-      // Generar un public_id único para Cloudinary
-      const publicId = `cunao/products/${productId}/image_${imageIndex}_${Date.now()}`;
+      // Generar un public_id único pero consistente usando hash de la URL
+      const crypto = require('crypto');
+      const urlHash = crypto.createHash('md5').update(imageUrl).digest('hex');
+      const publicId = `cunao/products/${productId}/image_${urlHash}`;
 
       // Subir a Cloudinary
       const uploadResult = await cloudinary.uploader.upload(

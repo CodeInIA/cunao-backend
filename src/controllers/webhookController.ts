@@ -255,6 +255,30 @@ async function handleProductPublishStarted(resource: any) {
         const printifyService = printifyServiceModule.getInstance();
         const imageService = imageServiceModule.getInstance();
         
+        // Verificar si el producto ya existe en la base de datos
+        const existingProduct = await db.getProductByPrintifyId(productId);
+        
+        if (existingProduct) {
+            console.log(`📋 Producto ${productId} ya existe en la base de datos`);
+            
+            // Verificar si las imágenes ya están optimizadas
+            const hasOptimizedImages = existingProduct.images?.some((img: any) => img.cdnUrl);
+            
+            if (hasOptimizedImages) {
+                console.log(`✅ Producto ${productId} ya tiene imágenes optimizadas, omitiendo reprocesamiento`);
+                
+                // Solo marcar como publicado si no lo está ya
+                const slug = slugify(existingProduct.title);
+                const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                const handle = `${frontendUrl}/producto/${slug}`;
+                await printifyService.setPublishSucceeded(productId, productId, handle);
+                
+                return;
+            } else {
+                console.log(`🔄 Producto ${productId} existe pero necesita optimización de imágenes`);
+            }
+        }
+        
         // Hacer GET a la API de Printify para obtener la información completa del producto
         const fullProduct = await printifyService.getProduct(productId);
         
