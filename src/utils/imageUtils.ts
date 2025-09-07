@@ -91,14 +91,14 @@ export function prepareImagesForStripe(images: (ProductImage | string)[]): strin
 }
 
 /**
- * Obtiene URL de imagen optimizada para emails
- * Asegura que sea WebP y esté disponible públicamente
+ * Obtiene URL de imagen original PNG para emails
+ * Para emails usamos PNG original de Printify para mejor compatibilidad
  */
 export function getEmailImageUrl(image: ProductImage | string): string {
   if (typeof image === 'string') {
-    return image;
+    return image; // Si ya es string, asumimos que es URL de Printify
   }
   
-  // Para emails, siempre usar CDN si está disponible (mejor deliverability)
-  return getOptimizedImageUrl(image, 'medium'); // Medium size para emails
+  // Para emails, usar siempre la imagen original PNG de Printify
+  return image.src; // URL original de Printify en formato PNG
 }

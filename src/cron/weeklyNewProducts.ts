@@ -281,7 +281,7 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
             <!-- Header -->
             <div class="header">
                 <div class="logo">
-                    <img src="https://cunadismoilustrado.me/logo-sin-letras.webp" alt="Cuñadismo Ilustrado" />
+                    <img src="${process.env.FRONTEND_URL || 'https://cunadismoilustrado.me'}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" />
                 </div>
                 <h1 class="brand-name">CUÑADISMO ILUSTRADO</h1>
                 <p class="subtitle">Nuevos Lanzamientos de la Semana</p>

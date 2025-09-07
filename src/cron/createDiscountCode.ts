@@ -278,7 +278,7 @@ const generateDiscountEmailHTML = (
     <div class="container">
         <div class="header">
             <div class="logo">
-                <img src="${frontendUrl}/logo-sin-letras.webp" alt="Cuñadismo Ilustrado Logo" />
+                <img src="${frontendUrl}/logo-sin-letras.png" alt="Cuñadismo Ilustrado Logo" />
             </div>
             <div class="brand-name">Cuñadismo Ilustrado</div>
         </div>

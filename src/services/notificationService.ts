@@ -10,8 +10,9 @@ import { getOptimizedImageUrl, getVariantImage, getEmailImageUrl } from '../util
 
 // --- PLANTILLA PRINCIPAL DE EMAIL MEJORADA ---
 const generateEmailTemplate = (title: string, content: string): string => {
-  const LOGO_URL = 'https://i.imgur.com/kxtvDwW.png'; // Logo sin letras
-  const WEBSITE_URL = process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
+  const LOGO_URL = `${FRONTEND_URL}/logo-sin-letras.png`; // Logo local sin letras
+  const WEBSITE_URL = FRONTEND_URL;
 
   // Paleta de colores de tu marca
   const bgColor = '#1E293B'; // Azul oscuro/grisáceo de fondo
