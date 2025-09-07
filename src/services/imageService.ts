@@ -97,20 +97,14 @@ class ImageService {
       const urlHash = crypto.createHash('md5').update(imageUrl).digest('hex');
       const publicId = `image_${urlHash}`;
 
-      // Subir a Cloudinary con organización por producto
+      // Subir a Cloudinary con máxima calidad WebP
       const uploadResult = await cloudinary.uploader.upload(
         `data:image/webp;base64,${webpBuffer.toString('base64')}`,
         {
           public_id: publicId,
           folder: `cunao/products/${productId}`, // Carpeta específica por producto
           format: 'webp',
-          // Crear transformaciones adicionales manteniendo la original
-          eager: [
-            { width: 400, height: 400, crop: 'fit', quality: 'auto' }, // Para thumbnails
-            { width: 800, height: 800, crop: 'fit', quality: 'auto' }, // Para vista media
-            { width: 1200, height: 1200, crop: 'fit', quality: 'auto' }, // Para zoom
-          ],
-          eager_async: true,
+          // Solo subir la imagen original en máxima calidad - sin transformaciones adicionales
         }
       );
 
@@ -356,37 +350,15 @@ class ImageService {
   }
 
   /**
-   * Genera URLs de diferentes tamaños para una imagen, incluyendo la original
-   * IMPORTANTE: 'original' y 'large' usan la URL sin transformaciones (máxima calidad)
+   * Genera la URL de máxima calidad original (simplificado - solo WebP original)
    */
   generateImageUrls(cdnUrl: string) {
-    // Extraer el public_id de la URL de Cloudinary
-    const publicIdMatch = cdnUrl.match(/\/v\d+\/(.+)\.[^.]+$/);
-    if (!publicIdMatch) return { 
-      thumbnail: cdnUrl, 
-      medium: cdnUrl, 
-      large: cdnUrl, 
-      original: cdnUrl 
-    };
-
-    const publicId = publicIdMatch[1];
-    
-    // Obtener la URL base hasta antes del public_id
-    const baseUrlMatch = cdnUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^\/]+\/image\/upload)\//);
-    if (!baseUrlMatch) return { 
-      thumbnail: cdnUrl, 
-      medium: cdnUrl, 
-      large: cdnUrl, 
-      original: cdnUrl 
-    };
-    
-    const baseUrl = baseUrlMatch[1];
-
+    // Solo devolver la URL original en máxima calidad para todo
     return {
-      thumbnail: `${baseUrl}/w_400,h_400,c_fit,q_auto/${publicId}.webp`,
-      medium: `${baseUrl}/w_800,h_800,c_fit,q_auto/${publicId}.webp`,
-      large: cdnUrl, // Usar URL original sin transformaciones para 'large'
-      original: cdnUrl // URL original con máxima calidad (sin transformaciones)
+      thumbnail: cdnUrl,
+      medium: cdnUrl,
+      large: cdnUrl,
+      original: cdnUrl
     };
   }
 }
