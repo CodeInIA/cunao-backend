@@ -96,7 +96,7 @@ const generateNewsletterContent = (customerName?: string, preferencesUrl?: strin
   // Configuración del frontend
   const config = {
     frontend: {
-      url: 'https://cunadismoilustrado.me'
+      url: process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://cunadismoilustrado.me'
     }
   };
   

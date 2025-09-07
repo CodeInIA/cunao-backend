@@ -462,8 +462,8 @@ async function createDiscountCode() {
         await subscriber.save();
         
         // Siempre usar la URL de producción para los enlaces de email
-        const preferencesUrl = `${process.env.FRONTEND_PRODUCTION_URL || 'https://www.cunadismoilustrado.me'}/newsletter/preferences?token=${token}`;
-        
+        const preferencesUrl = `${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'}/newsletter/preferences?token=${token}`;
+
         const emailHTML = generateDiscountEmailHTML(
           discountPercentage,
           code,
