@@ -92,31 +92,31 @@ class ImageService {
 
       const imageBuffer = Buffer.from(response.data);
 
-      // Convertir a WebP con compresión optimizada
+      // Convertir a WebP manteniendo resolución original y máxima calidad
       const webpBuffer = await sharp(imageBuffer)
         .webp({ 
-          quality: 85, // Buena calidad manteniendo tamaño pequeño
-          effort: 4    // Balance entre velocidad y compresión
+          quality: 95, // Máxima calidad
+          effort: 6,   // Máximo esfuerzo de compresión
+          lossless: false, // Compresión con pérdida mínima
         })
+        // NO redimensionar - mantener resolución original para máxima calidad
         .toBuffer();
 
       // Generar un public_id único pero consistente usando hash de la URL
       const urlHash = crypto.createHash('md5').update(imageUrl).digest('hex');
-      const publicId = `${productId}/image_${urlHash}`;
+      const publicId = `image_${urlHash}`;
 
-      // Subir a Cloudinary
+      // Subir a Cloudinary con organización por producto
       const uploadResult = await cloudinary.uploader.upload(
         `data:image/webp;base64,${webpBuffer.toString('base64')}`,
         {
           public_id: publicId,
-          folder: 'cunao/products',
+          folder: `cunao/products/${productId}`, // Carpeta específica por producto
           format: 'webp',
-          transformation: [
-            // Crear múltiples versiones de la imagen
-            { width: 800, height: 800, crop: 'fit', quality: 'auto' }, // Para vista de producto
-          ],
+          // Crear transformaciones adicionales manteniendo la original
           eager: [
             { width: 400, height: 400, crop: 'fit', quality: 'auto' }, // Para thumbnails
+            { width: 800, height: 800, crop: 'fit', quality: 'auto' }, // Para vista media
             { width: 1200, height: 1200, crop: 'fit', quality: 'auto' }, // Para zoom
           ],
           eager_async: true,
@@ -204,18 +204,28 @@ class ImageService {
   }
 
   /**
-   * Genera URLs de diferentes tamaños para una imagen
+   * Genera URLs de diferentes tamaños para una imagen, incluyendo la original
    */
   generateImageUrls(cdnUrl: string) {
     // Extraer el public_id de la URL de Cloudinary
     const publicIdMatch = cdnUrl.match(/\/v\d+\/(.+)\.[^.]+$/);
-    if (!publicIdMatch) return { thumbnail: cdnUrl, medium: cdnUrl, large: cdnUrl };
+    if (!publicIdMatch) return { 
+      thumbnail: cdnUrl, 
+      medium: cdnUrl, 
+      large: cdnUrl, 
+      original: cdnUrl 
+    };
 
     const publicId = publicIdMatch[1];
     
     // Obtener la URL base hasta antes del public_id
     const baseUrlMatch = cdnUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^\/]+\/image\/upload)\//);
-    if (!baseUrlMatch) return { thumbnail: cdnUrl, medium: cdnUrl, large: cdnUrl };
+    if (!baseUrlMatch) return { 
+      thumbnail: cdnUrl, 
+      medium: cdnUrl, 
+      large: cdnUrl, 
+      original: cdnUrl 
+    };
     
     const baseUrl = baseUrlMatch[1];
 
@@ -223,7 +233,7 @@ class ImageService {
       thumbnail: `${baseUrl}/w_400,h_400,c_fit,q_auto/${publicId}.webp`,
       medium: `${baseUrl}/w_800,h_800,c_fit,q_auto/${publicId}.webp`,
       large: `${baseUrl}/w_1200,h_1200,c_fit,q_auto/${publicId}.webp`,
-      original: cdnUrl
+      original: cdnUrl // URL original con máxima calidad
     };
   }
 }
