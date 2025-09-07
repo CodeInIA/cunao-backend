@@ -366,7 +366,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     }
 
     const orderData: OrderRequest = {
-      external_id: order.orderId, // Usar nuestro ID personalizado tipo "O123456789"
+      external_id: order.orderId, // Usar nuestro ID personalizado de 9 dígitos numéricos
       line_items: order.lineItems.map((item: any) => ({
         product_id: item.productId,
         variant_id: item.variantId,

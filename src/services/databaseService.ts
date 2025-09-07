@@ -112,7 +112,7 @@ const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProd
 
 // --- Interfaz para definir la estructura de un Pedido ---
 interface IOrder extends Document {
-  orderId: string; // ID personalizado tipo "O123456789"
+  orderId: string; // ID personalizado de 9 dígitos numéricos (ej: 123456789)
   printifyOrderId?: string;
   printifyDisplayId?: string; // ID único visible de Printify (ej: 238495590.45)
   stripeSessionId: string;
@@ -143,7 +143,7 @@ interface IOrder extends Document {
 
 // --- Esquema de Mongoose para el Pedido ---
 const OrderSchema: Schema = new Schema({
-  orderId: { type: String, required: true, unique: true, index: true }, // ID personalizado tipo "O123456789"
+  orderId: { type: String, required: true, unique: true, index: true }, // ID personalizado de 9 dígitos numéricos
   printifyOrderId: { type: String, index: true },
   printifyDisplayId: { type: String, index: true }, // ID único visible de Printify
   stripeSessionId: { type: String, required: false, index: true },
@@ -177,7 +177,7 @@ const OrderSchema: Schema = new Schema({
 const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
 
 class DatabaseService {
-  // Generar ID personalizado para pedidos (formato O123456789) con validación de unicidad
+  // Generar ID personalizado para pedidos (formato 9 dígitos numéricos) con validación de unicidad
   public async generateOrderId(): Promise<string> {
     let orderId: string;
     let isUnique = false;
@@ -190,10 +190,10 @@ class DatabaseService {
         throw new Error('No se pudo generar un order_id único después de múltiples intentos');
       }
 
-      // Generar ID basado en timestamp + número aleatorio para mayor unicidad
+      // Generar ID de 9 dígitos: timestamp (8 dígitos) + número aleatorio (1 dígito)
       const timestamp = Date.now().toString().slice(-8); // 8 dígitos del timestamp
-      const random = Math.floor(Math.random() * 10); // 1 dígito aleatorio
-      orderId = `O${timestamp}${random}`;
+      const random = Math.floor(Math.random() * 10); // 1 dígito aleatorio (0-9)
+      orderId = `${timestamp}${random}`;
 
       // Verificar si ya existe en la base de datos
       const existingOrder = await Order.findOne({ orderId }).exec();
