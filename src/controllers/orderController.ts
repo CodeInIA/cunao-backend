@@ -5,7 +5,7 @@ import stripeServiceModule from '../services/stripeService.js';
 import { db } from '../services/databaseService.js';
 import { activateAllMarketingPreferences } from '../cron/weeklyNewsletter.js';
 import DiscountCode from '../models/DiscountCode.js';
-import { getOptimizedImageUrl, getVariantImage, getMainProductImage, getWebPImageUrl } from '../utils/imageUtils.js';
+import { getOptimizedImageUrl, getVariantImage, getMainProductImage, getWebPImageUrl, getStripeImageUrl } from '../utils/imageUtils.js';
 import { 
   CheckoutRequest, 
   OrderRequest, 
@@ -239,7 +239,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
       currency: 'eur',
       product_data: {
         name: `${item.title} - Talla ${item.size}`,
-        images: [getWebPImageUrl(item.image)]
+        images: [getStripeImageUrl(item.image)]
       },
       unit_amount: Math.round(item.price * 100)
     },

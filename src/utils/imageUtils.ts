@@ -81,13 +81,26 @@ export function getWebPImageUrl(image: ProductImage | string): string {
 
 /**
  * Prepara imágenes para uso en Stripe checkout
- * Convierte todas las imágenes a URLs WebP optimizadas
+ * Convierte todas las imágenes a URLs PNG originales para mejor compatibilidad
  */
 export function prepareImagesForStripe(images: (ProductImage | string)[]): string[] {
   return images
     .filter(Boolean) // Filtrar valores null/undefined
-    .map(image => getWebPImageUrl(image))
+    .map(image => getStripeImageUrl(image))
     .slice(0, 8); // Stripe permite máximo 8 imágenes
+}
+
+/**
+ * Obtiene URL de imagen PNG original para Stripe checkout
+ * Para Stripe usamos PNG original de Printify para mejor compatibilidad
+ */
+export function getStripeImageUrl(image: ProductImage | string): string {
+  if (typeof image === 'string') {
+    return image; // Si ya es string, asumimos que es URL original de Printify
+  }
+  
+  // Para Stripe, usar siempre la imagen original PNG de Printify
+  return image.src; // URL original de Printify en formato PNG
 }
 
 /**
