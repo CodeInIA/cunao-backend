@@ -376,18 +376,25 @@ class DatabaseService {
         position = img.position;
       }
       
-      console.log(`Procesando imagen ${index}: position original="${img.position}", position final=${position}`);
+      console.log(`Procesando imagen ${index}: position original="${img.position}", position final=${position}, cdnUrl=${img.cdnUrl ? 'SÍ' : 'NO'}`);
       
       return {
         src: img.src,
         alt: img.alt || printifyProduct.title,
         position: position,
         is_default: img.is_default || index === 0,
-        variant_ids: img.variant_ids || []
+        variant_ids: img.variant_ids || [],
+        // Preservar datos del CDN si están disponibles
+        cdnUrl: img.cdnUrl,
+        cdnPublicId: img.cdnPublicId,
+        cdnUrls: img.cdnUrls
       };
     }) || [];
 
-    console.log(`Imágenes procesadas: ${processedImages.length}`);
+    console.log(`Imágenes procesadas: ${processedImages.length}`, {
+      withCdnUrls: processedImages.filter((img: any) => img.cdnUrl).length,
+      totalImages: processedImages.length
+    });
 
     return {
       printifyId: printifyProduct.id,
