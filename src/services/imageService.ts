@@ -357,6 +357,7 @@ class ImageService {
 
   /**
    * Genera URLs de diferentes tamaños para una imagen, incluyendo la original
+   * IMPORTANTE: 'original' y 'large' usan la URL sin transformaciones (máxima calidad)
    */
   generateImageUrls(cdnUrl: string) {
     // Extraer el public_id de la URL de Cloudinary
@@ -384,8 +385,8 @@ class ImageService {
     return {
       thumbnail: `${baseUrl}/w_400,h_400,c_fit,q_auto/${publicId}.webp`,
       medium: `${baseUrl}/w_800,h_800,c_fit,q_auto/${publicId}.webp`,
-      large: `${baseUrl}/w_1200,h_1200,c_fit,q_auto/${publicId}.webp`,
-      original: cdnUrl // URL original con máxima calidad
+      large: cdnUrl, // Usar URL original sin transformaciones para 'large'
+      original: cdnUrl // URL original con máxima calidad (sin transformaciones)
     };
   }
 }
