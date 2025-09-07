@@ -102,7 +102,7 @@ class ImageService {
 
       // Generar un public_id único pero consistente usando hash de la URL
       const urlHash = crypto.createHash('md5').update(imageUrl).digest('hex');
-      const publicId = `cunao/products/${productId}/image_${urlHash}`;
+      const publicId = `${productId}/image_${urlHash}`;
 
       // Subir a Cloudinary
       const uploadResult = await cloudinary.uploader.upload(
