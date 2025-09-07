@@ -6,6 +6,7 @@ import { sendEmail } from './emailService.js';
 import stripeService from './stripeService.js';
 import printifyService from './printifyService.js';
 import { db } from './databaseService.js';
+import { getOptimizedImageUrl, getVariantImage, getEmailImageUrl } from '../utils/imageUtils.js';
 
 // --- PLANTILLA PRINCIPAL DE EMAIL MEJORADA ---
 const generateEmailTemplate = (title: string, content: string): string => {
@@ -133,13 +134,13 @@ export async function sendOrderConfirmationEmail(session: any) {
           const printify = printifyService.getInstance();
           const product = await printify.getProduct(item.productId);
           if (product && product.variants && Array.isArray(product.variants)) {
-            // Buscar la imagen asociada a la variante
+            // Buscar la imagen WebP optimizada asociada a la variante
             if (product.images && Array.isArray(product.images)) {
-              const img = product.images.find((img: any) => img.variant_ids && img.variant_ids.includes(item.variantId));
-              if (img && img.src) {
-                imageUrl = img.src;
+              const variantImage = getVariantImage(product.images, item.variantId);
+              if (variantImage) {
+                imageUrl = getEmailImageUrl(variantImage);
               } else if (product.images.length > 0) {
-                imageUrl = product.images[0].src;
+                imageUrl = getEmailImageUrl(product.images[0]);
               }
             }
           }

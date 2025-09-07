@@ -5,6 +5,7 @@ import stripeServiceModule from '../services/stripeService.js';
 import { db } from '../services/databaseService.js';
 import { activateAllMarketingPreferences } from '../cron/weeklyNewsletter.js';
 import DiscountCode from '../models/DiscountCode.js';
+import { getOptimizedImageUrl, getVariantImage, getMainProductImage, getWebPImageUrl } from '../utils/imageUtils.js';
 import { 
   CheckoutRequest, 
   OrderRequest, 
@@ -203,9 +204,11 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     }
     const sizeOption = product.options.find((opt: ProductOption) => opt.type === 'size');
     const size = sizeOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
-    const mainImage = product.images.find((img: ProductImage) => img.is_default) || product.images[0];
-    const variantImage = product.images.find((img: ProductImage) => img.variant_ids?.includes(variant.id));
-    const imageToShow = variantImage?.src || mainImage?.src || '';
+    
+    // Obtener imagen optimizada WebP para esta variante
+    const variantImage = getVariantImage(product.images || [], variant.id);
+    const imageToShow = variantImage ? getOptimizedImageUrl(variantImage) : '';
+    
     return {
       productId: product.id,
       variantId: variant.id,
@@ -236,7 +239,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
       currency: 'eur',
       product_data: {
         name: `${item.title} - Talla ${item.size}`,
-        images: [item.image]
+        images: [getWebPImageUrl(item.image)]
       },
       unit_amount: Math.round(item.price * 100)
     },

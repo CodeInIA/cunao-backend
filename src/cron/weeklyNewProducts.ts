@@ -2,6 +2,7 @@ import WeeklyProduct, { IWeeklyProduct } from '../models/WeeklyProducts.js';
 import Newsletter, { INewsletter } from '../models/Newsletter.js';
 import { sendEmail } from '../services/emailService.js';
 import { generateNewsletterToken } from '../routes/newsletter.js';
+import { getEmailImageUrl } from '../utils/imageUtils.js';
 
 // Función slugify para crear URLs amigables
 const slugify = (text: string): string => {
@@ -297,7 +298,7 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 <div class="products-grid">
                     ${featuredProducts.map(product => `
                         <a href="${config.frontend.url}/producto/${slugify(product.title)}" class="product-card">
-                            <img src="${product.imageUrl}" alt="${product.title}" class="product-image" />
+                            <img src="${getEmailImageUrl(product.imageUrl)}" alt="${product.title}" class="product-image" />
                             <div class="product-title">${product.title}</div>
                         </a>
                     `).join('')}
