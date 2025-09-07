@@ -258,28 +258,7 @@ async function handleProductPublishStarted(resource: any) {
         // Verificar si el producto ya existe en la base de datos
         const existingProduct = await db.getProductByPrintifyId(productId);
         
-        if (existingProduct) {
-            console.log(`📋 Producto ${productId} ya existe en la base de datos`);
-            
-            // Verificar si las imágenes ya están optimizadas
-            const hasOptimizedImages = existingProduct.images?.some((img: any) => img.cdnUrl);
-            
-            if (hasOptimizedImages) {
-                console.log(`✅ Producto ${productId} ya tiene imágenes optimizadas, omitiendo reprocesamiento`);
-                
-                // Solo marcar como publicado si no lo está ya
-                const slug = slugify(existingProduct.title);
-                const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-                const handle = `${frontendUrl}/producto/${slug}`;
-                await printifyService.setPublishSucceeded(productId, productId, handle);
-                
-                return;
-            } else {
-                console.log(`🔄 Producto ${productId} existe pero necesita optimización de imágenes`);
-            }
-        }
-        
-        // Hacer GET a la API de Printify para obtener la información completa del producto
+        // Obtener la información completa actualizada del producto desde Printify
         const fullProduct = await printifyService.getProduct(productId);
         
         if (!fullProduct) {
@@ -293,9 +272,25 @@ async function handleProductPublishStarted(resource: any) {
             variantsCount: fullProduct.variants?.length || 0
         });
 
-        // Procesar todas las imágenes con sincronización inteligente
         let processedImages: any[] = [];
-        if (fullProduct.images && fullProduct.images.length > 0) {
+        
+        if (existingProduct) {
+            console.log(`� Producto ${productId} ya existe en la base de datos`);
+            
+            // Verificar si las imágenes ya están optimizadas
+            const hasOptimizedImages = existingProduct.images?.some((img: any) => img.cdnUrl);
+            
+            if (hasOptimizedImages) {
+                console.log(`✅ Producto ${productId} ya tiene imágenes optimizadas, reutilizando imágenes existentes`);
+                processedImages = existingProduct.images;
+            } else {
+                console.log(`🔄 Producto ${productId} existe pero necesita optimización de imágenes`);
+                // Procesar imágenes más adelante
+            }
+        }
+
+        // Procesar imágenes solo si es necesario (producto nuevo o imágenes no optimizadas)
+        if (processedImages.length === 0 && fullProduct.images && fullProduct.images.length > 0) {
             console.log(`🖼️ Iniciando procesamiento de imágenes para producto ${productId}`);
             
             // Usar sincronización inteligente que verifica imagen por imagen
