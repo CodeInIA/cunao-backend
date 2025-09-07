@@ -43,8 +43,8 @@ function main() {
       "shipped_at": "2022-05-17 15:00:00+00:00",
       "carrier": {
         "code": "UPS",
-        "tracking_number": "9400110200828911663274",
-        "tracking_url": "https://example.com/track/9400110200828911663274"
+        "tracking_number": "TRACK0000000000000000",
+        "tracking_url": "https://example.com/track/TRACK0000000000000000"
       },
       "skus": [
         "6202"
@@ -66,8 +66,8 @@ function main() {
       "delivered_at": "2022-05-17 15:00:00+00:00",
       "carrier": {
         "code": "UPS",
-        "tracking_number": "9400110200828911663274",
-        "tracking_url": "https://example.com/track/9400110200828911663274"
+        "tracking_number": "TRACK0000000000000000",
+        "tracking_url": "https://example.com/track/TRACK0000000000000000"
       },
       "skus": [
         "6202"
