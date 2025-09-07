@@ -301,15 +301,6 @@ async function handleProductPublishStarted(resource: any) {
                 existentes: syncResult.skippedImagesCount,
                 total: syncResult.totalImages
             });
-
-            // Si el producto ya existía, limpiar imágenes huérfanas
-            if (existingProduct) {
-                console.log(`🧹 Limpiando imágenes huérfanas del producto ${productId}`);
-                const cleanupResult = await imageService.cleanupOrphanedImages(productId, fullProduct.images);
-                if (cleanupResult.cleanedCount > 0) {
-                    console.log(`✅ ${cleanupResult.cleanedCount} imágenes huérfanas eliminadas`);
-                }
-            }
             
             // Combinar datos originales con URLs de CDN
             processedImages = fullProduct.images.map((originalImage, index) => {
@@ -335,6 +326,18 @@ async function handleProductPublishStarted(resource: any) {
             });
 
             console.log(`✅ Procesamiento de imágenes completado: ${syncResult.processedImages.length}/${fullProduct.images.length} imágenes optimizadas`);
+        }
+
+        // Ejecutar limpieza de imágenes huérfanas siempre que el producto ya exista
+        // Esto es importante para eliminar imágenes de colores/variantes que ya no existen
+        if (existingProduct) {
+            console.log(`🧹 Limpiando imágenes huérfanas del producto ${productId}`);
+            const cleanupResult = await imageService.cleanupOrphanedImages(productId, fullProduct.images);
+            if (cleanupResult.cleanedCount > 0) {
+                console.log(`✅ ${cleanupResult.cleanedCount} imágenes huérfanas eliminadas`);
+            } else {
+                console.log(`✨ No se encontraron imágenes huérfanas para eliminar`);
+            }
         }
 
         // Crear el producto con las imágenes procesadas
