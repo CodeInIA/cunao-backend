@@ -38,7 +38,7 @@ const getWeekYear = (date: Date = new Date()): string => {
 const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferencesUrl?: string) => {
   const config = {
     frontend: {
-      url: 'https://cunadismoilustrado.me'
+      url: 'https://www.cunadismoilustrado.me'
     }
   };
 
@@ -281,7 +281,7 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
             <!-- Header -->
             <div class="header">
                 <div class="logo">
-                    <img src="${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://cunadismoilustrado.me'}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" />
+                    <img src="${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" />
                 </div>
                 <h1 class="brand-name">CUÑADISMO ILUSTRADO</h1>
                 <p class="subtitle">Nuevos Lanzamientos de la Semana</p>
@@ -421,7 +421,7 @@ export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
         }
         
         // Generar URL de preferencias con el token verificado
-        const preferencesUrl = `https://cunadismoilustrado.me/newsletter/preferences?token=${token}`;
+        const preferencesUrl = `https://www.cunadismoilustrado.me/newsletter/preferences?token=${token}`;
         
         // Generar contenido del email
         const emailContent = generateNewProductsEmailContent(weeklyProducts, preferencesUrl);

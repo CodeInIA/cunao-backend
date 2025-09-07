@@ -96,7 +96,7 @@ const generateNewsletterContent = (customerName?: string, preferencesUrl?: strin
   // Configuración del frontend
   const config = {
     frontend: {
-      url: process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://cunadismoilustrado.me'
+      url: process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'
     }
   };
   
@@ -225,7 +225,7 @@ const generateNewsletterContent = (customerName?: string, preferencesUrl?: strin
             <!-- Header -->
             <div class="header">
                 <div class="logo">
-                    <img src="${process.env.FRONTEND_URL || 'https://cunadismoilustrado.me'}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" style="width: 120px; height: 120px; object-fit: contain;" />
+                    <img src="${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" style="width: 120px; height: 120px; object-fit: contain;" />
                 </div>
                 <h1 class="brand-name">CUÑADISMO ILUSTRADO</h1>
                 <p class="subtitle">Frase Cuñao de la Semana</p>
@@ -362,7 +362,7 @@ export const sendWeeklyNewsletter = async (): Promise<void> => {
         console.log(`✅ Token generado y guardado para ${subscriber.email}: ${token.substring(0, 10)}...`);
         
         // Generar URL de preferencias con el token verificado
-        const preferencesUrl = `https://cunadismoilustrado.me/newsletter/preferences?token=${token}`;
+        const preferencesUrl = `https://www.cunadismoilustrado.me/newsletter/preferences?token=${token}`;
         
         // Generar contenido del email
         const emailContent = generateNewsletterContent(customerInfo?.name, preferencesUrl);
