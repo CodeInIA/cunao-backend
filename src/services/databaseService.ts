@@ -14,6 +14,15 @@ interface IProduct extends Document {
     position: number;
     is_default: boolean;
     variant_ids: number[];
+    // URLs de CDN optimizadas
+    cdnUrl?: string;
+    cdnPublicId?: string;
+    cdnUrls?: {
+      thumbnail: string;
+      medium: string;
+      large: string;
+      original: string;
+    };
   }[];
   variants: {
     id: number;
@@ -65,7 +74,16 @@ const ProductSchema: Schema = new Schema({
     alt: { type: String },
     position: { type: Number, required: true },
     is_default: { type: Boolean, default: false },
-    variant_ids: [{ type: Number }]
+    variant_ids: [{ type: Number }],
+    // URLs de CDN optimizadas
+    cdnUrl: { type: String },
+    cdnPublicId: { type: String },
+    cdnUrls: {
+      thumbnail: { type: String },
+      medium: { type: String },
+      large: { type: String },
+      original: { type: String }
+    }
   }],
   variants: [{
     id: { type: Number, required: true },

@@ -11,11 +11,13 @@
     "test": "jest",
     "heroku-postbuild": "npm run build",
     "cancel-orders": "tsx src/cron/cancelAllPrintifyOrders.ts",
-    "create-discount": "tsx src/cron/createDiscountCode.ts"
+    "create-discount": "tsx src/cron/createDiscountCode.ts",
+    "migrate-images": "tsx src/scripts/migrateImages.ts"
   },
   "dependencies": {
     "@types/node-cron": "^3.0.11",
     "axios": "^1.11.0",
+    "cloudinary": "^2.7.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
@@ -26,6 +28,7 @@
     "mongoose": "^8.17.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
+    "sharp": "^0.34.3",
     "stripe": "^18.4.0"
   },
   "devDependencies": {
@@ -35,6 +38,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.3.0",
     "@types/nodemailer": "^7.0.1",
+    "@types/sharp": "^0.31.1",
     "jest": "^30.0.5",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2"

@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import stripeServiceModule from '../services/stripeService.js';
 import printifyServiceModule from '../services/printifyService.js';
+import imageServiceModule from '../services/imageService.js';
 import * as notificationService from '../services/notificationService.js';
 import { db } from '../services/databaseService.js';
 import { PrintifyProduct } from '../types/index.js';
@@ -252,6 +253,7 @@ async function handleProductPublishStarted(resource: any) {
 
     try {
         const printifyService = printifyServiceModule.getInstance();
+        const imageService = imageServiceModule.getInstance();
         
         // Hacer GET a la API de Printify para obtener la información completa del producto
         const fullProduct = await printifyService.getProduct(productId);
@@ -267,8 +269,47 @@ async function handleProductPublishStarted(resource: any) {
             variantsCount: fullProduct.variants?.length || 0
         });
 
+        // Procesar todas las imágenes: convertir a WebP y subir a CDN
+        let processedImages: any[] = [];
+        if (fullProduct.images && fullProduct.images.length > 0) {
+            console.log(`🖼️ Iniciando procesamiento de imágenes para producto ${productId}`);
+            
+            const imageResults = await imageService.processProductImages(productId, fullProduct.images);
+            
+            // Combinar datos originales con URLs de CDN
+            processedImages = fullProduct.images.map((originalImage, index) => {
+                const processedImage = imageResults.find(result => 
+                    result.originalUrl === originalImage.src
+                );
+                
+                if (processedImage) {
+                    // Generar URLs de diferentes tamaños
+                    const cdnUrls = imageService.generateImageUrls(processedImage.cdnUrl);
+                    
+                    return {
+                        ...originalImage,
+                        cdnUrl: processedImage.cdnUrl,
+                        cdnPublicId: processedImage.publicId,
+                        cdnUrls: cdnUrls
+                    };
+                } else {
+                    // Si falla el procesamiento, mantener la imagen original
+                    console.warn(`⚠️ No se pudo procesar la imagen ${originalImage.src}, manteniendo URL original`);
+                    return originalImage;
+                }
+            });
+
+            console.log(`✅ Procesamiento de imágenes completado: ${imageResults.length}/${fullProduct.images.length} imágenes optimizadas`);
+        }
+
+        // Crear el producto con las imágenes procesadas
+        const productToSave = {
+            ...fullProduct,
+            images: processedImages
+        };
+
         // Guardar el producto completo en MongoDB
-        await db.saveOrUpdateProduct(fullProduct);
+        await db.saveOrUpdateProduct(productToSave);
 
         // Marcar como publicado en Printify
         const slug = slugify(fullProduct.title);
@@ -285,9 +326,9 @@ async function handleProductPublishStarted(resource: any) {
             // Preparar datos del producto para la colección semanal
             const enabledVariants = fullProduct.variants?.filter((v: any) => v.is_enabled) || [];
             
-            // Encontrar la imagen por defecto
-            const defaultImage = fullProduct.images?.find((img: any) => img.is_default) || fullProduct.images?.[0];
-            const imageUrl = defaultImage?.src || '';
+            // Encontrar la imagen por defecto - priorizar CDN si está disponible
+            const defaultImage = processedImages.find((img: any) => img.is_default) || processedImages[0];
+            const imageUrl = defaultImage?.cdnUrls?.medium || defaultImage?.cdnUrl || defaultImage?.src || '';
             
             // Encontrar la variante que corresponde a la imagen por defecto
             let selectedVariant = enabledVariants[0]; // fallback
@@ -339,6 +380,28 @@ async function handleProductDeleted(resource: any) {
     console.log(`Procesando eliminación del producto: ${productId}`);
 
     try {
+        // Obtener el producto de la base de datos antes de eliminarlo para limpiar las imágenes de CDN
+        const product = await db.getProductByPrintifyId(productId);
+        
+        if (product && product.images) {
+            const imageService = imageServiceModule.getInstance();
+            
+            // Recopilar public_ids de Cloudinary para eliminar
+            const publicIds: string[] = [];
+            product.images.forEach((image: any) => {
+                if (image.cdnPublicId) {
+                    publicIds.push(image.cdnPublicId);
+                }
+            });
+
+            // Eliminar imágenes de Cloudinary
+            if (publicIds.length > 0) {
+                console.log(`🗑️ Eliminando ${publicIds.length} imágenes de CDN para producto ${productId}`);
+                await imageService.deleteImages(publicIds);
+            }
+        }
+
+        // Eliminar el producto de la base de datos
         const deleted = await db.deleteProductByPrintifyId(productId);
         if (deleted) {
             console.log(`Producto ${productId} eliminado exitosamente de la base de datos`);
