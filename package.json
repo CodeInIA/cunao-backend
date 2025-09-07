@@ -11,7 +11,6 @@
     "test": "jest",
     "heroku-postbuild": "npm run build",
     "cancel-orders": "tsx src/cron/cancelAllPrintifyOrders.ts",
-    "test-newsletter": "tsx src/scripts/testNewsletter.ts",
     "create-discount": "tsx src/cron/createDiscountCode.ts"
   },
   "dependencies": {
