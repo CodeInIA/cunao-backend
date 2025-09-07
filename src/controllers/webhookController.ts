@@ -381,11 +381,47 @@ async function handleProductPublishStarted(resource: any) {
                 }
             }
             
-            // Si estamos reutilizando imágenes existentes, mantener las que siguen válidas
+            // Reconstruir processedImages con las imágenes finales que deben estar en DB
+            console.log(`🔧 Reconstruyendo array final de imágenes para guardar en DB`);
+            
+            // Si estamos reutilizando imágenes existentes, partir de ellas
             if (processedImages.length > 0) {
                 // Filtrar solo las imágenes que siguen siendo válidas según Printify
                 processedImages = processedImages.filter(img => printifyImageUrls.has(img.src));
+                console.log(`🔄 Imágenes existentes válidas mantenidas: ${processedImages.length}`);
             }
+            
+            // Obtener todas las imágenes desde Printify y combinar con datos de CDN existentes/nuevos
+            const finalImages: any[] = [];
+            
+            for (const printifyImage of fullProduct.images) {
+                // Buscar si ya tenemos esta imagen procesada (ya sea existente o recién reutilizada)
+                let existingProcessed = processedImages.find(img => img.src === printifyImage.src);
+                
+                if (existingProcessed) {
+                    // Usar la imagen ya procesada
+                    finalImages.push(existingProcessed);
+                } else {
+                    // Buscar en las imágenes existentes de la DB si tiene datos de CDN
+                    const existingDbImage = dbImages.find(img => img.src === printifyImage.src);
+                    
+                    if (existingDbImage && existingDbImage.cdnUrl) {
+                        // Usar los datos de CDN existentes
+                        finalImages.push({
+                            ...printifyImage,
+                            cdnUrl: existingDbImage.cdnUrl,
+                            cdnPublicId: existingDbImage.cdnPublicId,
+                            cdnUrls: existingDbImage.cdnUrls
+                        });
+                    } else {
+                        // Imagen nueva sin procesar (fallback a URL original)
+                        finalImages.push(printifyImage);
+                    }
+                }
+            }
+            
+            processedImages = finalImages;
+            console.log(`✅ Array final de imágenes construido: ${processedImages.length} imágenes para guardar en DB`);
         }
 
         // Crear el producto con las imágenes procesadas
