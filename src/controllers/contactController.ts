@@ -157,7 +157,7 @@ export const sendContactForm = asyncHandler(async (req: Request, res: Response) 
         <!-- Header con gradiente -->
         <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 30px 20px; text-align: center; position: relative; border-bottom: 3px solid #fbbf24;">
           <div style="padding: 0; border-radius: 50%; width: 84px; height: 84px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; border: 3px solid #fbbf24;">
-            <img src="${frontendUrl}/logo-sin-letras.png" alt="Cuñadismo Ilustrado" style="width: 76px; height: 76px; border-radius: 50%; display: block; background: #0f172a; border: 2px solid #fbbf24; object-fit: cover;" />
+            <img src="${frontendUrl}/logo-sin-letras.webp" alt="Cuñadismo Ilustrado" style="width: 76px; height: 76px; border-radius: 50%; display: block; background: #0f172a; border: 2px solid #fbbf24; object-fit: cover;" />
           </div>
           <h1 style="color: #fbbf24; margin: 0; font-size: 28px; font-weight: bold;">Nuevo Mensaje de Contacto</h1>
           <p style="color: #cbd5e1; margin: 15px 0 0 0; font-style: italic; font-size: 16px;">"¡Tienes un mensaje, cuñao!"</p>
@@ -245,7 +245,7 @@ export const sendContactForm = asyncHandler(async (req: Request, res: Response) 
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #1e293b; padding: 0; border-radius: 12px; overflow: hidden; color: #e2e8f0;">
         <!-- Logo Header -->
         <div style="text-align: center; padding: 20px 20px 10px 20px; background: #1e293b;">
-          <img src="${frontendUrl}/logo-sin-letras.png" 
+          <img src="${frontendUrl}/logo-sin-letras.webp" 
                alt="Cuñadismo Ilustrado" 
                style="width: 80px; height: 80px; border-radius: 50%; 
                       box-shadow: 0 6px 16px rgba(251, 191, 36, 0.4);

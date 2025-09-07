@@ -225,7 +225,7 @@ const generateNewsletterContent = (customerName?: string, preferencesUrl?: strin
             <!-- Header -->
             <div class="header">
                 <div class="logo">
-                    <img src="https://cunadismoilustrado.me/logo-sin-letras.png" alt="Cuñadismo Ilustrado" style="width: 120px; height: 120px; object-fit: contain;" />
+                    <img src="https://cunadismoilustrado.me/logo-sin-letras.webp" alt="Cuñadismo Ilustrado" style="width: 120px; height: 120px; object-fit: contain;" />
                 </div>
                 <h1 class="brand-name">CUÑADISMO ILUSTRADO</h1>
                 <p class="subtitle">Frase Cuñao de la Semana</p>
