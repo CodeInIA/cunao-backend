@@ -169,7 +169,11 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     };
   });
 
+  // Generar ID personalizado para la orden (asíncrono para validar unicidad)
+  const customOrderId = await db.generateOrderId();
+
   const tempOrder = await db.saveOrder({
+    orderId: customOrderId,
     stripeSessionId: '', // Se actualizará después
     customerEmail: '', // Se actualizará después
     customerName: '', // Se actualizará después
@@ -242,16 +246,15 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   // Calcular subtotal para determinar envío gratuito
   const subtotal = secureItems.reduce((total: number, item: any) => total + (item.price * item.quantity), 0);
   
-  // Usar solo el ID del pedido en client_reference_id
+  // Usar solo el order_id personalizado en client_reference_id
   const stripeService = stripeServiceModule.getInstance();
-  // Tipar el _id correctamente
-  // Usar el ID temporal del pedido como client_reference_id
-  const tempOrderId = tempOrder?._id ? String(tempOrder._id) : '';
+  // Usar el orderId personalizado como client_reference_id
+  const orderIdForStripe = tempOrder?.orderId || '';
   
   // Preparar opciones para Stripe
   const stripeOptions: any = {
     shippingRegion,
-    client_reference_id: tempOrderId,
+    client_reference_id: orderIdForStripe,
     subtotal: subtotal
   };
 
@@ -305,13 +308,19 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
 
     const shippingAddress = customerDetails.address;
     
-    // Recuperar el pedido temporal usando el client_reference_id
+    // Recuperar el pedido temporal usando el client_reference_id (que es nuestro orderId personalizado)
     const orderId = session.client_reference_id;
     if (!orderId) {
       throw new Error('No se recibió client_reference_id en la sesión de Stripe.');
     }
 
-    let order = await db.findOrderByIdAndUpdate(orderId, {
+    let order = await db.findOrderByOrderId(orderId);
+    if (!order) {
+      throw new Error('No se encontró el pedido temporal en la base de datos por orderId.');
+    }
+
+    // Actualizar el pedido con la información de pago
+    order = await db.updateOrderByOrderId(orderId, {
       stripeSessionId: session.id,
       customerEmail: customerDetails.email || '',
       customerName: customerDetails.name || '',
@@ -327,7 +336,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     });
 
     if (!order) {
-      throw new Error('No se encontró el pedido temporal en la base de datos por client_reference_id.');
+      throw new Error('No se pudo actualizar el pedido en la base de datos.');
     }
 
     // Idempotencia: si ya fue enviado a Printify, no duplicar
@@ -357,7 +366,7 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     }
 
     const orderData: OrderRequest = {
-      external_id: session.id,
+      external_id: order.orderId, // Usar nuestro ID personalizado tipo "O123456789"
       line_items: order.lineItems.map((item: any) => ({
         product_id: item.productId,
         variant_id: item.variantId,
@@ -383,8 +392,19 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     const printifyService = printifyServiceModule.getInstance();
     const printifyOrder = await printifyService.createOrder(orderData);
 
-    await db.findOrderByStripeIdAndUpdate(session.id, {
+    // Usar nuestro orderId personalizado como ID de display en los correos
+    const orderDisplayId = order.orderId;
+    
+    console.log(`📋 Orden creada en Printify:`, {
+      customOrderId: order.orderId,
       printifyOrderId: printifyOrder.id,
+      externalId: printifyOrder.external_id,
+      status: printifyOrder.status
+    });
+
+    await db.updateOrderByOrderId(order.orderId, {
+      printifyOrderId: printifyOrder.id,
+      printifyDisplayId: orderDisplayId,
       status: 'processing'
     });
 

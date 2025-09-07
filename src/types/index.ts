@@ -108,6 +108,7 @@ export interface OrderLineItem {
 export interface PrintifyOrder {
   id: string;
   external_id: string;
+  label?: string;
   status: string;
   line_items: OrderLineItem[];
   address_to: ShippingAddress;
@@ -117,6 +118,13 @@ export interface PrintifyOrder {
   total_price: number;
   total_shipping: number;
   total_tax: number;
+  // Campos adicionales que Printify puede incluir
+  shop_id?: number;
+  order_key?: string;
+  display_id?: string;
+  // Para tracking
+  tracking_number?: string;
+  tracking_url?: string;
 }
 
 export interface Shipment {

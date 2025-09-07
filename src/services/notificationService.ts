@@ -117,9 +117,12 @@ export async function sendOrderConfirmationEmail(session: any) {
   }
   const lineItems = await stripe.getCheckoutSessionLineItems(session.id);
 
-  // Recuperar el pedido temporal usando client_reference_id
+  // Recuperar el pedido temporal usando client_reference_id (que es nuestro orderId personalizado)
   const orderId = session.client_reference_id;
-  const order = await db.findOrderByIdAndUpdate(orderId, {});
+  const order = await db.findOrderByOrderId(orderId);
+
+  // Usar el orderId personalizado como ID de display
+  const orderDisplayId = order?.orderId || session.id;
 
   let itemsHtml = '<div style="border-top: 1px solid #334155; margin-top: 20px; padding-top: 20px;">';
   if (order && order.lineItems) {
@@ -195,6 +198,9 @@ export async function sendOrderConfirmationEmail(session: any) {
   const title = `¡Gracias por tu pedido, ${customerName}!`;
   const content = `
     <p style="color: #FFFFFF;">Hemos recibido tu pedido y ya lo estamos procesando. Aquí tienes un resumen:</p>
+    ${orderDisplayId ? `<p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 16px; color: #FBBF24; font-weight: bold;">
+      Número de pedido: ${orderDisplayId}
+    </p>` : ''}
     ${itemsHtml}
     ${priceBreakdown}
     <p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 14px; color: #FFFFFF;">
@@ -210,14 +216,28 @@ export async function sendOrderConfirmationEmail(session: any) {
 }
 
 // --- Email de Pedido Enviado ---
-export async function sendShippingConfirmationEmail(shipmentData: any, customerEmail: string, customerName: string) {
+export async function sendShippingConfirmationEmail(shipmentData: any, customerEmail: string, customerName: string, printifyOrderId?: string) {
   const trackingNumber = shipmentData.carrier.tracking_number;
   const trackingUrl = shipmentData.carrier.tracking_url;
+
+  // Obtener el ID personalizado del pedido desde la base de datos
+  let orderDisplayId = '';
+  if (printifyOrderId) {
+    const order = await db.findOrderByPrintifyId(printifyOrderId);
+    if (order && order.orderId) {
+      orderDisplayId = order.orderId; // Usar nuestro ID personalizado
+    } else if (order && order.printifyOrderId) {
+      orderDisplayId = order.printifyOrderId; // Fallback
+    }
+  }
 
   const title = '¡Tu pedido ya está en camino!';
   const content = `
     <p>Hola ${customerName},</p>
     <p>¡Buenas noticias! Tu pedido está en manos del transportista y va de camino. Puedes seguir tu paquete usando el siguiente enlace:</p>
+    ${orderDisplayId ? `<p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 16px; color: #FBBF24; font-weight: bold;">
+      Número de pedido: ${orderDisplayId}
+    </p>` : ''}
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
       <tr>
         <td align="center" style="padding: 20px 0;">
@@ -238,11 +258,25 @@ export async function sendShippingConfirmationEmail(shipmentData: any, customerE
 }
 
 // --- Email de Pedido Entregado ---
-export async function sendDeliveryConfirmationEmail(deliveryData: any, customerEmail: string, customerName: string) {
+export async function sendDeliveryConfirmationEmail(deliveryData: any, customerEmail: string, customerName: string, printifyOrderId?: string) {
+  // Obtener el ID personalizado del pedido desde la base de datos
+  let orderDisplayId = '';
+  if (printifyOrderId) {
+    const order = await db.findOrderByPrintifyId(printifyOrderId);
+    if (order && order.orderId) {
+      orderDisplayId = order.orderId; // Usar nuestro ID personalizado
+    } else if (order && order.printifyOrderId) {
+      orderDisplayId = order.printifyOrderId; // Fallback
+    }
+  }
+
   const title = '¡Tu pedido ha sido entregado!';
   const content = `
     <p>Hola ${customerName},</p>
     <p>El transportista nos ha confirmado que tu paquete ha sido entregado. ¡Esperamos que te encante!</p>
+    ${orderDisplayId ? `<p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 16px; color: #FBBF24; font-weight: bold;">
+      Número de pedido: ${orderDisplayId}
+    </p>` : ''}
     <p>Nos ayudaría muchísimo si pudieras dejarnos una reseña en nuestra web o redes sociales. ¡Tu opinión es oro!</p>
     <p>Gracias por tu compra,</p>
     <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>

@@ -112,7 +112,9 @@ const Product: Model<IProduct> = mongoose.models.Product || mongoose.model<IProd
 
 // --- Interfaz para definir la estructura de un Pedido ---
 interface IOrder extends Document {
+  orderId: string; // ID personalizado tipo "O123456789"
   printifyOrderId?: string;
+  printifyDisplayId?: string; // ID único visible de Printify (ej: 238495590.45)
   stripeSessionId: string;
   customerEmail: string;
   customerName: string;
@@ -141,7 +143,9 @@ interface IOrder extends Document {
 
 // --- Esquema de Mongoose para el Pedido ---
 const OrderSchema: Schema = new Schema({
+  orderId: { type: String, required: true, unique: true, index: true }, // ID personalizado tipo "O123456789"
   printifyOrderId: { type: String, index: true },
+  printifyDisplayId: { type: String, index: true }, // ID único visible de Printify
   stripeSessionId: { type: String, required: false, index: true },
   customerEmail: { type: String, required: false },
   customerName: { type: String, required: false },
@@ -173,6 +177,49 @@ const OrderSchema: Schema = new Schema({
 const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
 
 class DatabaseService {
+  // Generar ID personalizado para pedidos (formato O123456789) con validación de unicidad
+  public async generateOrderId(): Promise<string> {
+    let orderId: string;
+    let isUnique = false;
+    let attempts = 0;
+    const maxAttempts = 100; // Prevenir bucle infinito
+
+    do {
+      attempts++;
+      if (attempts > maxAttempts) {
+        throw new Error('No se pudo generar un order_id único después de múltiples intentos');
+      }
+
+      // Generar ID basado en timestamp + número aleatorio para mayor unicidad
+      const timestamp = Date.now().toString().slice(-8); // 8 dígitos del timestamp
+      const random = Math.floor(Math.random() * 10); // 1 dígito aleatorio
+      orderId = `O${timestamp}${random}`;
+
+      // Verificar si ya existe en la base de datos
+      const existingOrder = await Order.findOne({ orderId }).exec();
+      isUnique = !existingOrder;
+
+      if (!isUnique) {
+        console.log(`🔄 Order ID ${orderId} ya existe, generando uno nuevo... (intento ${attempts})`);
+        // Pequeña pausa para evitar generar el mismo timestamp
+        await new Promise(resolve => setTimeout(resolve, 1));
+      }
+    } while (!isUnique && attempts < maxAttempts);
+
+    console.log(`✅ Order ID único generado: ${orderId} (intentos: ${attempts})`);
+    return orderId;
+  }
+
+  // Buscar orden por order_id personalizado
+  public async findOrderByOrderId(orderId: string): Promise<IOrder | null> {
+    return Order.findOne({ orderId }).exec();
+  }
+
+  // Actualizar orden por order_id personalizado
+  public async updateOrderByOrderId(orderId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
+    return Order.findOneAndUpdate({ orderId }, updateData, { new: true }).exec();
+  }
+
   // Actualizar pedido por _id
   public async findOrderByIdAndUpdate(orderId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
     return Order.findByIdAndUpdate(orderId, updateData, { new: true }).exec();

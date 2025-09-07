@@ -106,15 +106,15 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
 async function handleCheckoutCompleted(session: any) {
   console.log('Checkout completado:', session.id);
 
-  // Usar client_reference_id para actualizar la orden existente
+  // Usar client_reference_id para actualizar la orden existente (ahora es nuestro orderId personalizado)
   const orderId = session.client_reference_id;
   if (!orderId) {
     console.error('No se recibió client_reference_id en la sesión de Stripe.');
     return;
   }
 
-  // Actualizar la orden existente
-  const updatedOrder = await db.findOrderByIdAndUpdate(orderId, {
+  // Actualizar la orden existente usando el orderId personalizado
+  const updatedOrder = await db.updateOrderByOrderId(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
     customerName: session.customer_details.name,
@@ -130,7 +130,7 @@ async function handleCheckoutCompleted(session: any) {
   });
 
   if (!updatedOrder) {
-    console.error('No se encontró la orden en la base de datos para actualizar por client_reference_id:', orderId);
+    console.error('No se encontró la orden en la base de datos para actualizar por orderId:', orderId);
     return;
   }
 
@@ -362,9 +362,9 @@ async function handleShipmentCreated(resource: any) {
       trackingNumber: resource.data.carrier.tracking_number,
       trackingUrl: resource.data.carrier.tracking_url
     });
-    // CAMBIO: Pasamos el nombre del cliente a la función de notificación
+    // CAMBIO: Pasamos el ID de Printify y el nombre del cliente a la función de notificación
     const firstName = orderInDb.customerName.split(' ')[0];
-    await notificationService.sendShippingConfirmationEmail(resource.data, orderInDb.customerEmail, firstName);
+    await notificationService.sendShippingConfirmationEmail(resource.data, orderInDb.customerEmail, firstName, printifyOrderId);
   } else {
     console.error(`No se encontró el pedido o los datos del cliente ${printifyOrderId} en la BD.`);
   }
@@ -380,9 +380,9 @@ async function handleShipmentDelivered(resource: any) {
     await db.updateOrderByPrintifyId(printifyOrderId, {
       status: 'delivered'
     });
-    // CAMBIO: Pasamos el nombre del cliente a la función de notificación
+    // CAMBIO: Pasamos el ID de Printify y el nombre del cliente a la función de notificación
     const firstName = orderInDb.customerName.split(' ')[0];
-    await notificationService.sendDeliveryConfirmationEmail(resource.data, orderInDb.customerEmail, firstName);
+    await notificationService.sendDeliveryConfirmationEmail(resource.data, orderInDb.customerEmail, firstName, printifyOrderId);
   } else {
     console.error(`No se encontró el pedido o los datos del cliente ${printifyOrderId} en la BD.`);
   }
