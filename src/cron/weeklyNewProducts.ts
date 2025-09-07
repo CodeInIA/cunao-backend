@@ -156,7 +156,6 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 object-fit: contain;
                 border-radius: 8px;
                 margin-bottom: 12px;
-                background: #ffffff;
                 padding: 8px;
                 display: block;
             }
