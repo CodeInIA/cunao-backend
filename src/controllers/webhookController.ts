@@ -293,16 +293,32 @@ async function handleProductPublishStarted(resource: any) {
             variantsCount: fullProduct.variants?.length || 0
         });
 
-        // Procesar todas las imágenes: convertir a WebP y subir a CDN
+        // Procesar todas las imágenes con sincronización inteligente
         let processedImages: any[] = [];
         if (fullProduct.images && fullProduct.images.length > 0) {
             console.log(`🖼️ Iniciando procesamiento de imágenes para producto ${productId}`);
             
-            const imageResults = await imageService.processProductImages(productId, fullProduct.images);
+            // Usar sincronización inteligente que verifica imagen por imagen
+            const syncResult = await imageService.processProductImagesSync(productId, fullProduct.images);
+            
+            console.log(`📊 Resultado de sincronización:`, {
+                nuevas: syncResult.newImagesCount,
+                existentes: syncResult.skippedImagesCount,
+                total: syncResult.totalImages
+            });
+
+            // Si el producto ya existía, limpiar imágenes huérfanas
+            if (existingProduct) {
+                console.log(`🧹 Limpiando imágenes huérfanas del producto ${productId}`);
+                const cleanupResult = await imageService.cleanupOrphanedImages(productId, fullProduct.images);
+                if (cleanupResult.cleanedCount > 0) {
+                    console.log(`✅ ${cleanupResult.cleanedCount} imágenes huérfanas eliminadas`);
+                }
+            }
             
             // Combinar datos originales con URLs de CDN
             processedImages = fullProduct.images.map((originalImage, index) => {
-                const processedImage = imageResults.find(result => 
+                const processedImage = syncResult.processedImages.find(result => 
                     result.originalUrl === originalImage.src
                 );
                 
@@ -323,7 +339,7 @@ async function handleProductPublishStarted(resource: any) {
                 }
             });
 
-            console.log(`✅ Procesamiento de imágenes completado: ${imageResults.length}/${fullProduct.images.length} imágenes optimizadas`);
+            console.log(`✅ Procesamiento de imágenes completado: ${syncResult.processedImages.length}/${fullProduct.images.length} imágenes optimizadas`);
         }
 
         // Crear el producto con las imágenes procesadas
@@ -404,33 +420,32 @@ async function handleProductDeleted(resource: any) {
     console.log(`Procesando eliminación del producto: ${productId}`);
 
     try {
-        // Obtener el producto de la base de datos antes de eliminarlo para limpiar las imágenes de CDN
+        // Obtener el producto de la base de datos antes de eliminarlo
         const product = await db.getProductByPrintifyId(productId);
         
-        if (product && product.images) {
+        if (product) {
+            console.log(`📋 Producto ${productId} encontrado en base de datos, eliminando recursos`);
+            
             const imageService = imageServiceModule.getInstance();
             
-            // Recopilar public_ids de Cloudinary para eliminar
-            const publicIds: string[] = [];
-            product.images.forEach((image: any) => {
-                if (image.cdnPublicId) {
-                    publicIds.push(image.cdnPublicId);
-                }
-            });
-
-            // Eliminar imágenes de Cloudinary
-            if (publicIds.length > 0) {
-                console.log(`🗑️ Eliminando ${publicIds.length} imágenes de CDN para producto ${productId}`);
-                await imageService.deleteImages(publicIds);
+            // Eliminar todas las imágenes del producto del CDN usando la nueva función
+            const deleteResult = await imageService.deleteProductImages(productId);
+            
+            if (deleteResult.deletedCount > 0) {
+                console.log(`🗑️ ${deleteResult.deletedCount} imágenes eliminadas del CDN`);
+            }
+            
+            if (deleteResult.errors.length > 0) {
+                console.warn(`⚠️ Errores eliminando imágenes del CDN:`, deleteResult.errors);
             }
         }
 
         // Eliminar el producto de la base de datos
         const deleted = await db.deleteProductByPrintifyId(productId);
         if (deleted) {
-            console.log(`Producto ${productId} eliminado exitosamente de la base de datos`);
+            console.log(`✅ Producto ${productId} eliminado exitosamente de la base de datos y CDN`);
         } else {
-            console.log(`El producto ${productId} no se encontró en la base de datos`);
+            console.log(`📋 El producto ${productId} no se encontró en la base de datos`);
         }
     } catch (error) {
         console.error(`Error al eliminar el producto ${productId}:`, error);
