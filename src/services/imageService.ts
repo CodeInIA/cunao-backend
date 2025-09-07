@@ -212,7 +212,12 @@ class ImageService {
     if (!publicIdMatch) return { thumbnail: cdnUrl, medium: cdnUrl, large: cdnUrl };
 
     const publicId = publicIdMatch[1];
-    const baseUrl = cdnUrl.substring(0, cdnUrl.lastIndexOf('/'));
+    
+    // Obtener la URL base hasta antes del public_id
+    const baseUrlMatch = cdnUrl.match(/^(https:\/\/res\.cloudinary\.com\/[^\/]+\/image\/upload)\//);
+    if (!baseUrlMatch) return { thumbnail: cdnUrl, medium: cdnUrl, large: cdnUrl };
+    
+    const baseUrl = baseUrlMatch[1];
 
     return {
       thumbnail: `${baseUrl}/w_400,h_400,c_fit,q_auto/${publicId}.webp`,
