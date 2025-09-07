@@ -83,14 +83,14 @@ class ImageService {
 
       const imageBuffer = Buffer.from(response.data);
 
-      // Convertir a WebP manteniendo resolución original y máxima calidad
+      // Convertir a WebP con compresión optimizada para menor tamaño
       const webpBuffer = await sharp(imageBuffer)
         .webp({ 
-          quality: 95, // Máxima calidad
-          effort: 6,   // Máximo esfuerzo de compresión
-          lossless: false, // Compresión con pérdida mínima
+          quality: 75,    // Calidad 75% para balance perfecto calidad/tamaño
+          effort: 4,      // Esfuerzo de compresión moderado (balance velocidad/compresión)
+          lossless: false // Compresión con pérdida para archivos más pequeños
         })
-        // NO redimensionar - mantener resolución original para máxima calidad
+        // Mantener resolución original pero con menor peso
         .toBuffer();
 
       // Generar un public_id único pero consistente usando hash de la URL
