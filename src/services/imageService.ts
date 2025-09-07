@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import axios from 'axios';
+import crypto from 'crypto';
 import { v2 as cloudinary } from 'cloudinary';
 
 // Configurar Cloudinary
@@ -25,7 +26,6 @@ class ImageService {
   async checkImageExists(originalUrl: string, productId: string): Promise<string | null> {
     try {
       // Generar el hash de la URL para crear un public_id consistente
-      const crypto = require('crypto');
       const urlHash = crypto.createHash('md5').update(originalUrl).digest('hex');
       const publicId = `cunao/products/${productId}/image_${urlHash}`;
 
@@ -101,7 +101,6 @@ class ImageService {
         .toBuffer();
 
       // Generar un public_id único pero consistente usando hash de la URL
-      const crypto = require('crypto');
       const urlHash = crypto.createHash('md5').update(imageUrl).digest('hex');
       const publicId = `cunao/products/${productId}/image_${urlHash}`;
 
