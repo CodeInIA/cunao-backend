@@ -528,7 +528,7 @@ export const startNewProductsEmailScheduler = (): void => {
     setInterval(async () => {
       console.log('📧 [DEV] Enviando email de nuevos productos de prueba...');
       await sendWeeklyNewProductsEmail();
-    }, 10 * 1 * 1000); // 15 minutos
+    }, 15 * 60 * 1000); // 15 minutos
 
     console.log('🕒 Email de nuevos productos scheduler configurado para desarrollo (cada 15 minutos)');
   } else {

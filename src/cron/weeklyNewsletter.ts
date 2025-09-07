@@ -479,7 +479,7 @@ export const startNewsletterScheduler = (): void => {
     setInterval(async () => {
       console.log('📧 [DEV] Enviando newsletter de prueba...');
       await sendWeeklyNewsletter();
-    }, 10 * 1 * 1000); // 15 minutos
+    }, 15 * 60 * 1000); // 15 minutos
 
     console.log('🕒 Newsletter scheduler configurado para desarrollo (cada 15 minutos)');
   } else {
