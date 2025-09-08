@@ -223,7 +223,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const successUrl = `${frontendUrl}/success?session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${frontendUrl}/cart`;
+  const cancelUrl = `${frontendUrl}/checkout`;
 
   const lineItemsForStripe = secureItems.map((item: {
     productId: string;
