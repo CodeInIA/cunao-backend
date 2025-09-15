@@ -346,7 +346,22 @@ async function createDiscountCode() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Conectado a MongoDB\n');
     
-    // 1. Pedir porcentaje de descuento
+    // 1. Pedir tipo de descuento (subtotal o envio)
+    let appliesTo: 'subtotal' | 'shipping';
+    while (true) {
+      const typeInput = await question('🔖 ¿El descuento aplica al (1) subtotal de productos o (2) envío? Escribe 1 o 2: ');
+      if (typeInput.trim() === '1') {
+        appliesTo = 'subtotal';
+        break;
+      } else if (typeInput.trim() === '2') {
+        appliesTo = 'shipping';
+        break;
+      } else {
+        console.log('❌ Respuesta no válida. Escribe 1 para subtotal o 2 para envío.\n');
+      }
+    }
+
+    // 2. Pedir porcentaje de descuento
     let discountPercentage: number;
     while (true) {
       const percentageInput = await question('💰 ¿Qué porcentaje de descuento quieres ofrecer? (1-100): ');
@@ -358,11 +373,11 @@ async function createDiscountCode() {
       }
       break;
     }
-    
-    // 2. Pedir código de descuento
+
+    // 3. Pedir código de descuento
     let code: string;
     while (true) {
-      const codeInput = await question('🏷️  ¿Qué código quieres usar para este descuento? (ej: CUÑADO2025): ');
+      const codeInput = await question('🏷️  ¿Qué código quieres usar para este descuento? (ej: CUNADISMO): ');
       code = codeInput.trim().toUpperCase();
       
       if (!/^[A-ZÁÉÍÓÚÑ0-9_-]{3,20}$/.test(code)) {
@@ -377,6 +392,22 @@ async function createDiscountCode() {
         continue;
       }
       break;
+    }
+
+    // 4. Preguntar si se envían emails a suscriptores
+    let sendEmails = false;
+    while (true) {
+      const sendInput = await question('📧 ¿Quieres enviar este descuento por email a los suscriptores de la newsletter? (yes/no): ');
+      const v = sendInput.trim().toLowerCase();
+      if (v === 'yes' || v === 'y' || v === 'si' || v === 's') {
+        sendEmails = true;
+        break;
+      } else if (v === 'no' || v === 'n') {
+        sendEmails = false;
+        break;
+      } else {
+        console.log('❌ Respuesta no válida. Escribe yes o no.\n');
+      }
     }
     
     // 3. Pedir fecha de expiración
@@ -410,10 +441,12 @@ async function createDiscountCode() {
     }
     
     // 4. Mostrar resumen y confirmar
-    console.log('\n📋 === RESUMEN DEL CÓDIGO DE DESCUENTO ===');
-    console.log(`💰 Descuento: ${discountPercentage}%`);
-    console.log(`🏷️  Código: ${code}`);
-    console.log(`📅 Vigencia: ${expiryText}`);
+  console.log('\n📋 === RESUMEN DEL CÓDIGO DE DESCUENTO ===');
+  console.log(`💰 Descuento: ${discountPercentage}%`);
+  console.log(`🏷️  Código: ${code}`);
+  console.log(`📍 Aplica a: ${appliesTo === 'shipping' ? 'Envío' : 'Subtotal'}`);
+  console.log(`📅 Vigencia: ${expiryText}`);
+  console.log(`📧 Enviar emails a suscriptores: ${sendEmails ? 'Sí' : 'No'}`);
     console.log('===========================================\n');
     
     const confirmation = await question('✅ ¿Los datos son correctos? (yes/no): ');
@@ -428,71 +461,85 @@ async function createDiscountCode() {
       code,
       discountPercentage,
       expiryDate,
-      isActive: true
+      isActive: true,
+      appliesTo
     });
     
     await discountCode.save();
     console.log('✅ Código de descuento guardado en la base de datos');
     
-    // 6. Obtener clientes con promociones activadas
-    console.log('\n📧 Buscando clientes para envío de emails...');
-    const subscribers = await Newsletter.find({
-      'preferences.promotions': true
-    });
-    
-    console.log(`📊 Encontrados ${subscribers.length} clientes con promociones activadas`);
-    
-    if (subscribers.length === 0) {
-      console.log('ℹ️  No hay clientes con promociones activadas. El código se ha creado pero no se enviará ningún email.');
-      return;
-    }
-    
-    // 7. Enviar emails
-    console.log('\n📬 Enviando emails...');
+    // Contadores para reportes finales (declarados aquí para visibilidad fuera del bloque)
     let emailsSent = 0;
     let emailsFailed = 0;
-    
-    for (const subscriber of subscribers) {
-      try {
-        // Generar token para preferencias
-        const token = generateNewsletterToken(subscriber.email);
-        
-        // Actualizar token en la base de datos
-        subscriber.lastToken = token;
-        await subscriber.save();
-        
-        // Siempre usar la URL de producción para los enlaces de email
-        const preferencesUrl = `${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'}/newsletter/preferences?token=${token}`;
 
-        const emailHTML = generateDiscountEmailHTML(
-          discountPercentage,
-          code,
-          expiryText,
-          '', // No tenemos nombres en la colección newsletter
-          preferencesUrl
-        );
-        
-        await sendEmail({
-          to: subscriber.email,
-          subject: `🎉 ¡${discountPercentage}% de descuento exclusivo para ti!`,
-          html: emailHTML
-        });
-        
-        emailsSent++;
-        console.log(`✅ Email enviado a: ${subscriber.email}`);
-        
-      } catch (error) {
-        emailsFailed++;
-        console.log(`❌ Error enviando email a ${subscriber.email}:`, error);
+    if (sendEmails) {
+      // 6. Obtener clientes con promociones activadas (solo si se van a enviar emails)
+      console.log('\n📧 Buscando clientes para envío de emails...');
+      const subscribers = await Newsletter.find({
+        'preferences.promotions': true
+      });
+      console.log(`📊 Encontrados ${subscribers.length} clientes con promociones activadas`);
+
+      if (subscribers.length === 0) {
+        console.log('ℹ️  No hay clientes con promociones activadas. El código se ha creado pero no se enviará ningún email.');
+      } else {
+        // 7. Enviar emails
+        console.log('\n📬 Enviando emails...');
+        for (const subscriber of subscribers) {
+          // Comprobar de nuevo antes de cada envío por seguridad
+          if (!sendEmails) {
+            console.log('⚠️  Envío de emails cancelado durante el proceso. Saliendo del bucle.');
+            break;
+          }
+          try {
+            // Generar token para preferencias
+            const token = generateNewsletterToken(subscriber.email);
+            
+            // Actualizar token en la base de datos
+            subscriber.lastToken = token;
+            await subscriber.save();
+            
+            // Siempre usar la URL de producción para los enlaces de email
+            const preferencesUrl = `${process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me'}/newsletter/preferences?token=${token}`;
+
+            const emailHTML = generateDiscountEmailHTML(
+              discountPercentage,
+              code,
+              expiryText,
+              '', // No tenemos nombres en la colección newsletter
+              preferencesUrl
+            );
+            
+            await sendEmail({
+              to: subscriber.email,
+              subject: `🎉 ¡${discountPercentage}% de descuento exclusivo para ti!`,
+              html: emailHTML
+            });
+            
+            emailsSent++;
+            console.log(`✅ Email enviado a: ${subscriber.email}`);
+            
+          } catch (error) {
+            emailsFailed++;
+            console.log(`❌ Error enviando email a ${subscriber.email}:`, error);
+          }
+        }
+        console.log(`\n🎉 === PROCESO DE EMAILS COMPLETADO ===`);
+        console.log(`📧 Emails enviados: ${emailsSent}`);
+        console.log(`❌ Emails fallidos: ${emailsFailed}`);
       }
+    } else {
+      console.log('ℹ️  Has elegido no enviar emails. El código se ha creado sin notificar a los suscriptores.');
     }
     
-    console.log(`\n🎉 === PROCESO COMPLETADO ===`);
-    console.log(`📧 Emails enviados: ${emailsSent}`);
-    console.log(`❌ Emails fallidos: ${emailsFailed}`);
-    console.log(`💰 Código de descuento "${code}" creado con ${discountPercentage}% de descuento`);
-    console.log(`📅 Vigencia: ${expiryText}`);
-    console.log('==============================\n');
+  console.log(`\n🎉 === PROCESO COMPLETADO ===`);
+  console.log(`📧 Emails enviados: ${emailsSent}`);
+  console.log(`❌ Emails fallidos: ${emailsFailed}`);
+  console.log(`💰 Código de descuento "${code}" creado con ${discountPercentage}% de descuento`);
+  console.log(`📍 Aplica a: ${appliesTo === 'shipping' ? 'Envío' : 'Subtotal'}`);
+  console.log(`📅 Vigencia: ${expiryText}`);
+  console.log(`📧 Enviado notificación a suscriptores: ${sendEmails ? 'Sí' : 'No'}`);
+  console.log('==============================\n');
     
   } catch (error) {
     console.error('❌ Error durante el proceso:', error);

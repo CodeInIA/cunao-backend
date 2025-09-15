@@ -6,6 +6,7 @@ import { ApiResponse } from '../types/index.js';
 interface ValidateDiscountRequest {
   code: string;
   subtotal: number;
+  shippingCost?: number;
 }
 
 interface ValidateDiscountResponse {
@@ -13,12 +14,15 @@ interface ValidateDiscountResponse {
   discountPercentage?: number;
   discountAmount?: number;
   finalTotal?: number;
+  appliesTo?: 'subtotal' | 'shipping';
   message?: string;
 }
 
 // Validar código de descuento
 export const validateDiscountCode = asyncHandler(async (req: Request, res: Response) => {
-  const { code, subtotal }: ValidateDiscountRequest = req.body;
+  const { code, subtotal } : ValidateDiscountRequest = req.body;
+  const hasShippingCost = Object.prototype.hasOwnProperty.call(req.body, 'shippingCost');
+  const shippingCost: number = hasShippingCost ? req.body.shippingCost : 0;
   
   if (!code || !code.trim()) {
     const response: ApiResponse<ValidateDiscountResponse> = {
@@ -51,15 +55,40 @@ export const validateDiscountCode = asyncHandler(async (req: Request, res: Respo
       return res.status(200).json(response);
     }
 
-    // Calcular descuento
-    const discountAmount = (subtotal * discountCode.discountPercentage) / 100;
-    const finalTotal = Math.max(0, subtotal - discountAmount);
+    // Calcular descuento según aplica a subtotal o a envío
+    let discountAmount = 0;
+    let finalTotal = subtotal;
+
+    if (discountCode.appliesTo === 'shipping') {
+      // Si no se proporcionó shippingCost, informar al frontend que es necesario seleccionar región
+      if (!hasShippingCost) {
+        const response: ApiResponse<ValidateDiscountResponse> = {
+          success: true,
+          data: {
+            isValid: true,
+            discountPercentage: discountCode.discountPercentage,
+            appliesTo: discountCode.appliesTo,
+            message: 'Este código aplica al envío. Selecciona la región de envío para calcular el total.'
+          }
+        };
+        return res.status(200).json(response);
+      }
+
+      // Aplicar al coste de envío provisto
+      discountAmount = (shippingCost * discountCode.discountPercentage) / 100;
+      finalTotal = Math.max(0, subtotal + shippingCost - discountAmount);
+    } else {
+      // Por defecto aplicar al subtotal
+      discountAmount = (subtotal * discountCode.discountPercentage) / 100;
+      finalTotal = Math.max(0, subtotal - discountAmount + shippingCost);
+    }
 
     const response: ApiResponse<ValidateDiscountResponse> = {
       success: true,
       data: {
         isValid: true,
         discountPercentage: discountCode.discountPercentage,
+        appliesTo: discountCode.appliesTo,
         discountAmount: Math.round(discountAmount * 100) / 100, // Redondear a 2 decimales
         finalTotal: Math.round(finalTotal * 100) / 100,
         message: `¡Código válido! ${discountCode.discountPercentage}% de descuento aplicado`

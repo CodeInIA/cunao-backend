@@ -78,6 +78,7 @@ class StripeService {
       subtotal?: number;
       discountCode?: string;
       discountPercentage?: number;
+      discountAppliesTo?: 'subtotal' | 'shipping';
     }
   ): Promise<Stripe.Checkout.Session> {
     try {
@@ -114,6 +115,13 @@ class StripeService {
           throw new Error('Región de envío no válida');
       }
 
+      // Ajustar el importe de envío si el descuento aplica solo al envío
+      let shippingAmount = shippingOption.amount;
+      if (options?.discountPercentage && options?.discountAppliesTo === 'shipping') {
+        const discountAmount = Math.round((shippingAmount * options.discountPercentage) / 100);
+        shippingAmount = Math.max(0, shippingAmount - discountAmount);
+      }
+
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
         payment_method_types: ['card'],
         line_items: lineItems,
@@ -133,7 +141,7 @@ class StripeService {
             shipping_rate_data: {
               type: 'fixed_amount',
               fixed_amount: {
-                amount: shippingOption.amount,
+                amount: shippingAmount,
                 currency: 'eur',
               },
               display_name: shippingOption.display_name,
@@ -143,8 +151,8 @@ class StripeService {
         billing_address_collection: 'required'
       };
 
-      // Añadir descuento si existe
-      if (options?.discountCode && options?.discountPercentage) {
+      // Añadir descuento si existe (solo si no es un descuento exclusivo para envío)
+      if (options?.discountCode && options?.discountPercentage && options?.discountAppliesTo !== 'shipping') {
         try {
           console.log(`🎟️ Creando cupón de descuento en Stripe: ${options.discountCode} (${options.discountPercentage}%)`);
           
@@ -166,9 +174,7 @@ class StripeService {
             max_redemptions: 1,
           });
 
-          sessionParams.discounts = [{
-            coupon: coupon.id
-          }];
+          sessionParams.discounts = [{ coupon: coupon.id }];
 
           console.log(`✅ Cupón de descuento creado: ${coupon.id} (${options.discountPercentage}%) para código ${options.discountCode}`);
         } catch (error) {

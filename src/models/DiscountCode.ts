@@ -5,6 +5,7 @@ export interface IDiscountCode extends Document {
   discountPercentage: number;
   expiryDate?: Date;
   isActive: boolean;
+  appliesTo?: 'subtotal' | 'shipping';
   createdAt: Date;
   updatedAt: Date;
   isValid(): boolean;
@@ -55,6 +56,12 @@ const DiscountCodeSchema: Schema = new Schema({
   isActive: {
     type: Boolean,
     default: true
+  }
+  ,
+  appliesTo: {
+    type: String,
+    enum: ['subtotal', 'shipping'],
+    default: 'subtotal'
   }
 }, {
   timestamps: true

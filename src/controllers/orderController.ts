@@ -126,7 +126,8 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
       if (discount) {
         appliedDiscount = {
           code: discount.code,
-          percentage: discount.discountPercentage
+          percentage: discount.discountPercentage,
+          appliesTo: discount.appliesTo
         };
         console.log(`✅ Código de descuento válido: ${appliedDiscount.code} (${appliedDiscount.percentage}%)`);
       } else {
@@ -265,6 +266,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
   if (appliedDiscount) {
     stripeOptions.discountCode = appliedDiscount.code;
     stripeOptions.discountPercentage = appliedDiscount.percentage;
+    stripeOptions.discountAppliesTo = appliedDiscount.appliesTo;
   }
 
   const session = await stripeService.createCheckoutSession(
@@ -275,6 +277,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
       email_marketing: emailMarketing ? 'true' : 'false',
       discount_code: appliedDiscount?.code || '',
       discount_percentage: appliedDiscount?.percentage?.toString() || '',
+      discount_applies_to: appliedDiscount?.appliesTo || '',
       shipping_region: shippingRegion
     }, // Metadata con preferencia de email marketing, descuento y región de envío
     stripeOptions
