@@ -219,7 +219,8 @@ export const getFeaturedProducts = asyncHandler(async (req: Request, res: Respon
         (
           product.tags.map(tag => tag.toLowerCase()).includes('destacado') ||
           product.tags.map(tag => tag.toLowerCase()).includes('popular') ||
-          product.tags.map(tag => tag.toLowerCase()).includes('clásico')
+          product.tags.map(tag => tag.toLowerCase()).includes('clásico') ||
+          product.tags.map(tag => tag.toLowerCase()).includes('tendencia')
         )
       )
       .slice(0, 6) // Máximo 6 productos destacados
@@ -246,7 +247,8 @@ export const getFeaturedProducts = asyncHandler(async (req: Request, res: Respon
         (
           product.tags.map(tag => tag.toLowerCase()).includes('destacado') ||
           product.tags.map(tag => tag.toLowerCase()).includes('popular') ||
-          product.tags.map(tag => tag.toLowerCase()).includes('clásico')
+          product.tags.map(tag => tag.toLowerCase()).includes('clásico') ||
+          product.tags.map(tag => tag.toLowerCase()).includes('tendencia')
         )
       )
       .slice(0, 6);
