@@ -20,8 +20,19 @@ async function cancelAllPrintifyOrders() {
         } else {
           console.error(`No se pudo cancelar ${order.id}`);
         }
-      } catch (err) {
-        console.error(`Error al cancelar ${order.id}:`, err);
+      } catch (err: any) {
+        let errorMessage = `Error al cancelar el pedido ${order.id} en Printify:`;
+        if (err.response && err.response.data && err.response.data.message) {
+          errorMessage += ` ${err.response.data.message}`;
+          if (err.response.data.errors && err.response.data.errors.reason) {
+            errorMessage += ` (Razón: ${err.response.data.errors.reason})`;
+          }
+        } else if (err.message) {
+          errorMessage += ` ${err.message}`;
+        } else {
+          errorMessage += ` Ocurrió un error desconocido.`;
+        }
+        console.error(errorMessage);
       }
     } else {
       console.log(`No se puede cancelar ${order.id} (estado: ${order.status})`);

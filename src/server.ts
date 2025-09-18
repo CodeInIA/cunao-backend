@@ -3,7 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 import { errorHandler } from './middleware/errorHandler.js';
 import productRoutes from './routes/products.js';
@@ -18,8 +19,6 @@ import imageRoutes from './routes/images.js';
 import { db } from './services/databaseService.js';
 import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
-
-dotenv.config();
 
 db.connect();
 
@@ -90,6 +89,26 @@ app.set('trust proxy', 1);
 app.listen(PORT, () => {
   console.log(`🚀 Servidor de Cuñadismo Ilustrado ejecutándose en puerto ${PORT}`);
   console.log(`🌍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+
+  if (process.env.NODE_ENV === 'development') {
+    try {
+      const envPath = path.resolve(process.cwd(), '.env');
+      const envFileContent = fs.readFileSync(envPath, { encoding: 'utf-8' });
+      console.log('\n--- Variables de entorno cargadas desde .env ---');
+      envFileContent.split(/\r?\n/).forEach(line => {
+        const trimmedLine = line.trim();
+        if (trimmedLine && !trimmedLine.startsWith('#')) {
+          const [key] = trimmedLine.split('=');
+          if (key && process.env[key]) {
+            console.log(`${key}=${process.env[key]}`);
+          }
+        }
+      });
+      console.log('\n---------------------------------------------\n');
+    } catch (error) {
+      console.log('No se pudo leer el fichero .env para mostrar las variables.');
+    }
+  }
   
   // Inicializar scheduler de newsletter
   startNewsletterScheduler();
