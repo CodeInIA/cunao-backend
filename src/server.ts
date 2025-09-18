@@ -77,13 +77,13 @@ app.get('/health', (req, res) => {
 });
 
 // Middlewares finales de manejo de errores y 404
-app.use(errorHandler);
-app.all('*', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     error: 'Ruta no encontrada',
     message: `No se puede encontrar ${req.originalUrl} en este servidor.`
   });
 });
+app.use(errorHandler);
 
 app.set('trust proxy', 1);
 
