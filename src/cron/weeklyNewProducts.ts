@@ -524,13 +524,9 @@ export const startNewProductsEmailScheduler = (): void => {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
   if (isDevelopment) {
-    // Cada 15 minutos en desarrollo
-    setInterval(async () => {
-      console.log('📧 [DEV] Enviando email de nuevos productos de prueba...');
-      await sendWeeklyNewProductsEmail();
-    }, 15 * 60 * 1000); // 15 minutos
-
-    console.log('🕒 Email de nuevos productos scheduler configurado para desarrollo (cada 15 minutos)');
+    // En desarrollo desactivamos el envío automático para evitar correos cada 15 minutos.
+    // Usa `sendNewProductsEmailManual()` para probar manualmente el envío.
+    console.log('🕒 [DEV] Scheduler de nuevos productos desactivado en desarrollo (no se enviarán emails automáticamente)');
   } else {
     // Cada domingo a las 18:00 en producción
     setInterval(async () => {
