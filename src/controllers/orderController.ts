@@ -431,9 +431,23 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       }
     }
 
+    // Preparar items para devolver al frontend (precio y cantidad)
+    const responseItems = order.lineItems?.map((it: any) => ({
+      productId: it.productId,
+      variantId: it.variantId,
+      title: it.title,
+      price: it.price,
+      quantity: it.quantity
+    })) || [];
+
     res.status(200).json({
       success: true,
-      data: { order_id: printifyOrder.id, status: printifyOrder.status },
+      data: {
+        order_id: printifyOrder.id,
+        status: printifyOrder.status,
+        total: order.totalAmount || 0,
+        items: responseItems
+      },
       message: `Pedido procesado. Envío a producción: ${autoSubmit}`
     });
     
