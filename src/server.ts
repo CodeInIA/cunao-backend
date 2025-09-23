@@ -13,6 +13,7 @@ import webhookRoutes from './routes/webhooks.js';
 import configRoutes from './routes/config.js';
 import contactRoutes from './routes/contact.js';
 import newsletterRoutes from './routes/newsletter.js';
+import analyticsRoutes from './routes/analytics.js';
 import weeklyProductsRoutes from './routes/weeklyProducts.js';
 import discountRoutes from './routes/discounts.js';
 import imageRoutes from './routes/images.js';
@@ -65,6 +66,7 @@ app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/weekly-products', weeklyProductsRoutes);
 app.use('/api/discounts', discountRoutes);
 app.use('/api/images', imageRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Ruta de salud
 app.get('/health', (req, res) => {
