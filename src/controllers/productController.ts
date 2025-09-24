@@ -62,8 +62,12 @@ function mapDbProductToApiFormat(dbProduct: any): PrintifyProduct {
 // Obtener todos los productos
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   try {
-    // Obtener productos de MongoDB
-    const dbProducts = await db.getProducts();
+    // Leer parámetro opcional limit desde query
+    const limitParam = req.query.limit;
+    const limit = limitParam && typeof limitParam === 'string' ? parseInt(limitParam, 10) : undefined;
+
+    // Obtener productos de MongoDB (posible limit)
+    const dbProducts = await db.getProducts(limit);
     
     // Convertir al formato esperado por el frontend
     const products = dbProducts.map(mapDbProductToApiFormat);

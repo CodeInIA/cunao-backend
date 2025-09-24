@@ -321,10 +321,15 @@ class DatabaseService {
   }
 
   /**
-   * Obtener todos los productos visibles de la base de datos
+   * Obtener productos visibles de la base de datos.
+   * Si se pasa `limit`, limita la cantidad devuelta.
    */
-  public async getProducts(): Promise<IProduct[]> {
-    return Product.find({ visible: true }).exec();
+  public async getProducts(limit?: number): Promise<IProduct[]> {
+    const query = Product.find({ visible: true });
+    if (typeof limit === 'number' && limit > 0) {
+      query.limit(limit);
+    }
+    return query.exec();
   }
 
   /**
