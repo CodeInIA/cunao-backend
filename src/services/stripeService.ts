@@ -123,7 +123,6 @@ class StripeService {
       }
 
       const sessionParams: Stripe.Checkout.SessionCreateParams = {
-        payment_method_types: ['card'],
         line_items: lineItems,
         mode: 'payment',
         success_url: successUrl,
