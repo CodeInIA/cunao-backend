@@ -101,11 +101,22 @@ export async function submitReview(req: Request, res: Response) {
     const allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
 
     for (const r of reviewsPayload) {
-      // soportar keys como product-<productId>-<idx> o product-<productId>
-      const photosForField = Object.entries(grouped)
-        .filter(([k]) => k.startsWith(`product-${r.productId}`))
-        .map(([_, arr]) => arr)
-        .flat();
+      // soportar keys como product-<productId>-<idx> o product-<productId> o product-<fieldKey>
+      let photosForField: any[] = [];
+      if (r.fieldKey) {
+        // buscar coincidencias exactas que empiecen por product-<fieldKey>
+        photosForField = Object.entries(grouped)
+          .filter(([k]) => k.startsWith(`product-${r.fieldKey}`))
+          .map(([_, arr]) => arr)
+          .flat();
+      }
+      // fallback al comportamiento anterior (por productId) si no hay fieldKey o no se encontraron archivos
+      if ((!photosForField || photosForField.length === 0) && r.productId) {
+        photosForField = Object.entries(grouped)
+          .filter(([k]) => k.startsWith(`product-${r.productId}`))
+          .map(([_, arr]) => arr)
+          .flat();
+      }
 
       const reviewDoc = new Review({
         orderId: order.orderId,
