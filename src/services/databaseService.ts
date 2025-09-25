@@ -196,7 +196,9 @@ const OrderSchema: Schema = new Schema({
   reviewToken: {
     token: { type: String },
     createdAt: { type: Date },
-    expiresAt: { type: Date }
+    expiresAt: { type: Date },
+    used: { type: Boolean, default: false },
+    submittedAt: { type: Date }
   },
 }, {
   timestamps: true
@@ -290,7 +292,11 @@ class DatabaseService {
   
   // Crear un token de review para una orden
   public async createReviewTokenForOrder(orderId: string, token: string, expiresAt: Date): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ orderId }, { reviewToken: { token, createdAt: new Date(), expiresAt } }, { new: true }).exec();
+    return Order.findOneAndUpdate({ orderId }, { reviewToken: { token, createdAt: new Date(), expiresAt, used: false } }, { new: true }).exec();
+  }
+
+  public async markReviewTokenUsed(orderId: string): Promise<IOrder | null> {
+    return Order.findOneAndUpdate({ orderId }, { 'reviewToken.used': true, 'reviewToken.submittedAt': new Date() }, { new: true }).exec();
   }
 
   public async findOrderByReviewToken(token: string): Promise<IOrder | null> {

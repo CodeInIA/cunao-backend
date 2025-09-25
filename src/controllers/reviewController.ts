@@ -22,6 +22,10 @@ export async function validateToken(req: Request, res: Response) {
   if (!token) return res.status(400).json({ error: 'Token requerido' });
   const order = await db.findOrderByReviewToken(token);
   if (!order) return res.status(404).json({ valid: false });
+  const tokenUsed = !!(order.reviewToken && (order.reviewToken as any).used);
+  if (tokenUsed) {
+    return res.json({ valid: false, tokenUsed: true, customerName: order.customerName, orderId: order.orderId });
+  }
   return res.json({ valid: true, customerName: order.customerName, orderId: order.orderId, lineItems: order.lineItems });
 }
 
@@ -104,7 +108,12 @@ export async function submitReview(req: Request, res: Response) {
       savedReviews.push(reviewDoc);
     }
 
-    await db.clearReviewToken(order.orderId);
+    // Mark the review token as used so the same token cannot be reused to submit again
+    try {
+      await db.markReviewTokenUsed(order.orderId);
+    } catch (e) {
+      console.warn('Warning: could not mark review token as used', e);
+    }
 
     return res.json({ success: true, reviews: savedReviews });
   } catch (error: any) {
