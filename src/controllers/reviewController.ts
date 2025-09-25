@@ -14,6 +14,59 @@ function checkAdmin(req: any) {
   return key && key === ADMIN_KEY;
 }
 
+// Helpers: format author name for display (Name + initials of surnames)
+function shortenName(name?: string) {
+  if (!name) return 'Anónimo';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts.slice(1).map(p => p[0]).join('. ')}.`;
+}
+
+function formatReviewForResponse(review: any) {
+  // work with plain object
+  const obj = review && typeof review.toObject === 'function' ? review.toObject() : (review._doc ? review._doc : { ...review });
+  obj.authorName = shortenName(obj.authorName);
+  return obj;
+}
+
+// helper slugify (mirror databaseService.slugify so frontend/back share same slugs)
+function slugify(text: string) {
+  if (!text) return '';
+  return text
+    .toString()
+    .toLowerCase()
+    .replace(/ñ/g, 'n')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function enrichReviewsWithProductInfo(reviews: any[]) {
+  const plain = reviews.map(r => (r && typeof r.toObject === 'function' ? r.toObject() : (r._doc ? r._doc : { ...r })));
+  const productIds = Array.from(new Set(plain.map(p => p.productId).filter(Boolean)));
+  const productPromises = productIds.map(pid => db.getProductByPrintifyId(String(pid)).catch(() => null));
+  const products = await Promise.all(productPromises);
+  const productMap: Record<string, any> = {};
+  productIds.forEach((pid, i) => { productMap[String(pid)] = products[i]; });
+
+  return plain.map(p => {
+    const out: any = { ...p };
+    out.authorName = shortenName(out.authorName);
+    const prod = productMap[String(out.productId)];
+    if (prod) {
+      out.productTitle = prod.title || '';
+      out.productSlug = slugify(prod.title || '');
+    } else {
+      out.productTitle = undefined;
+      out.productSlug = undefined;
+    }
+    return out;
+  });
+}
+
 // Tamaño máximo total por review: 8MB (considerando hasta 5 imágenes por producto)
 const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024;
 // Mínimos requeridos
@@ -171,7 +224,8 @@ export async function submitReview(req: Request, res: Response) {
       console.warn('Warning: could not mark review token as used', e);
     }
 
-    return res.json({ success: true, reviews: savedReviews });
+  const enriched = await enrichReviewsWithProductInfo(savedReviews);
+  return res.json({ success: true, reviews: enriched });
   } catch (error: any) {
     console.error('Error submitReview', error);
     return res.status(500).json({ error: 'Error interno' });
@@ -183,8 +237,9 @@ export async function listReviews(req: Request, res: Response) {
     const productId = req.query.productId as string | undefined;
     const query: any = { status: 'published' };
     if (productId) query.productId = productId;
-    const reviews = await Review.find(query).sort({ createdAt: -1 }).limit(50).exec();
-    return res.json(reviews);
+  const reviews = await Review.find(query).sort({ createdAt: -1 }).limit(50).exec();
+  const enriched = await enrichReviewsWithProductInfo(reviews);
+  return res.json(enriched);
   } catch (e) {
     console.error('listReviews error', e);
     return res.status(500).json([]);
