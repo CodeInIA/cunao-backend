@@ -14,6 +14,8 @@ function checkAdmin(req: any) {
 
 // Tamaño máximo total por review: 8MB (considerando hasta 5 imágenes por producto)
 const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024;
+// Mínimos requeridos
+const MIN_REVIEW_CHARS = 20;
 
 export async function validateToken(req: Request, res: Response) {
   const { token } = req.params;
@@ -53,6 +55,20 @@ export async function submitReview(req: Request, res: Response) {
       const field = f.fieldname || 'default';
       grouped[field] = grouped[field] || [];
       grouped[field].push(f);
+    }
+
+    // Validación server-side: mínimo de caracteres por producto
+    const validationErrors: Record<string, any> = {};
+    for (const r of reviewsPayload) {
+      const errs: any = {};
+      if (!r.body || (r.body || '').toString().trim().length < MIN_REVIEW_CHARS) {
+        errs.text = `La reseña debe tener al menos ${MIN_REVIEW_CHARS} caracteres.`;
+      }
+      if (Object.keys(errs).length > 0) validationErrors[r.productId] = errs;
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      return res.status(400).json({ error: 'Validation failed', validationErrors });
     }
 
     const savedReviews: any[] = [];
