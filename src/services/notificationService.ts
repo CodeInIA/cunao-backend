@@ -2,6 +2,7 @@
 
 
 import Stripe from 'stripe';
+import crypto from 'crypto';
 import { sendEmail } from './emailService.js';
 import stripeService from './stripeService.js';
 import printifyService from './printifyService.js';
@@ -273,13 +274,57 @@ export async function sendDeliveryConfirmationEmail(deliveryData: any, customerE
   }
 
   const title = '¡Tu pedido ha sido entregado!';
+  // Generar token de review y crear enlace si encontramos la orden en nuestra base
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
+  let reviewLinkHtml = '';
+  try {
+    if (orderDisplayId || printifyOrderId) {
+      // Intentar buscar la orden por nuestro orderId personalizado
+      let order = null;
+      if (orderDisplayId) order = await db.findOrderByOrderId(orderDisplayId);
+      // Si no la encontramos, intentar por printifyOrderId
+      if (!order && printifyOrderId) order = await db.findOrderByPrintifyId(printifyOrderId);
+      if (order && order.orderId) {
+        // Reusar token si ya existe y no ha expirado
+        let token: string | null = null;
+        let expiresAt: Date | null = null;
+        if (order.reviewToken && order.reviewToken.token) {
+          const existingExpires = order.reviewToken.expiresAt ? new Date(order.reviewToken.expiresAt) : null;
+          if (!existingExpires || existingExpires > new Date()) {
+            token = order.reviewToken.token as string;
+            expiresAt = existingExpires;
+            console.log(`Se reutiliza token de review existente para order ${order.orderId}: ${token}`);
+          }
+        }
+
+        if (!token) {
+          token = crypto.randomBytes(48).toString('hex');
+          expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 días
+          await db.createReviewTokenForOrder(order.orderId, token, expiresAt);
+          console.log(`Se creó token de review para order ${order.orderId}: ${token}`);
+        }
+
+        const reviewUrl = `${FRONTEND_URL}/review/${token}`;
+        reviewLinkHtml = `
+          <p style="text-align: center; margin: 20px 0;">
+            <a href="${reviewUrl}" style="background-color: #FBBF24; color: #0F172A; padding: 12px 22px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Dejar una reseña</a>
+          </p>
+          <p style="text-align: center; color: #E2E8F0; font-size: 13px;">Enlace válido 14 días (hasta ${expiresAt?.toLocaleDateString()})</p>
+        `;
+      }
+    }
+  } catch (e) {
+    console.warn('No se pudo crear token de review para la orden:', e);
+  }
+
   const content = `
     <p>Hola ${customerName},</p>
     <p>El transportista nos ha confirmado que tu paquete ha sido entregado. ¡Esperamos que te encante!</p>
     ${orderDisplayId ? `<p style="background-color: #2d3748; border: 1px solid #475569; padding: 15px; border-radius: 5px; text-align: center; font-size: 16px; color: #FBBF24; font-weight: bold;">
       Número de pedido: ${orderDisplayId}
     </p>` : ''}
-    <p>Nos ayudaría muchísimo si pudieras dejarnos una reseña en nuestra web o redes sociales. ¡Tu opinión es oro!</p>
+    <p>Nos ayudaría muchísimo si pudieras dejarnos una reseña en nuestra web. ¡Tu opinión es oro!</p>
+    ${reviewLinkHtml}
     <p>Gracias por tu compra,</p>
     <p><strong>El equipo de Cuñadismo Ilustrado</strong></p>
   `;

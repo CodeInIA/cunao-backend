@@ -157,6 +157,11 @@ interface IOrder extends Document {
   trackingNumber?: string;
   trackingUrl?: string;
   region?: string;
+  reviewToken?: {
+    token: string;
+    createdAt?: Date;
+    expiresAt?: Date;
+  } | null;
 }
 
 // --- Esquema de Mongoose para el Pedido ---
@@ -188,11 +193,19 @@ const OrderSchema: Schema = new Schema({
   trackingNumber: String,
   trackingUrl: String,
   region: { type: String },
+  reviewToken: {
+    token: { type: String },
+    createdAt: { type: Date },
+    expiresAt: { type: Date }
+  },
 }, {
   timestamps: true
 });
 
 const Order: Model<IOrder> = mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
+
+// Exponer modelo para otros módulos
+(Order as any).modelName = 'Order';
 
 class DatabaseService {
   // Generar ID personalizado para pedidos (formato 9 dígitos numéricos) con validación de unicidad
@@ -273,6 +286,19 @@ class DatabaseService {
     await newOrder.save();
     console.log(`Pedido ${newOrder._id} guardado en la base de datos.`);
     return newOrder;
+  }
+  
+  // Crear un token de review para una orden
+  public async createReviewTokenForOrder(orderId: string, token: string, expiresAt: Date): Promise<IOrder | null> {
+    return Order.findOneAndUpdate({ orderId }, { reviewToken: { token, createdAt: new Date(), expiresAt } }, { new: true }).exec();
+  }
+
+  public async findOrderByReviewToken(token: string): Promise<IOrder | null> {
+    return Order.findOne({ 'reviewToken.token': token }).exec();
+  }
+
+  public async clearReviewToken(orderId: string): Promise<IOrder | null> {
+    return Order.findOneAndUpdate({ orderId }, { $unset: { reviewToken: '' } }, { new: true }).exec();
   }
   
   // NUEVA FUNCIÓN para encontrar un pedido por el ID de sesión de Stripe y actualizarlo
@@ -446,3 +472,6 @@ class DatabaseService {
 }
 
 export const db = DatabaseService.getInstance();
+
+// Exponer el modelo Order para otros controladores que lo necesiten
+(db as any).OrderModel = Order;

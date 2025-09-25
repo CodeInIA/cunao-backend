@@ -17,6 +17,7 @@ import analyticsRoutes from './routes/analytics.js';
 import weeklyProductsRoutes from './routes/weeklyProducts.js';
 import discountRoutes from './routes/discounts.js';
 import imageRoutes from './routes/images.js';
+import reviewsRoutes from './routes/reviews.js';
 import { db } from './services/databaseService.js';
 import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
@@ -49,6 +50,9 @@ app.use(cors({
 //    Stripe y Printify necesitan el 'raw body'. Usamos express.raw() solo para esta ruta
 //    y le pasamos directamente el router de webhooks para que se encargue.
 app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+
+// Rutas que manejan multipart/form-data (multer) - montarlas ANTES del bodyParser general
+app.use('/api/reviews', reviewsRoutes);
 
 // 2. Middleware para parsear JSON DESPUÉS.
 //    Esto se aplicará a todas las demás rutas que sí necesitan un body en formato JSON.
