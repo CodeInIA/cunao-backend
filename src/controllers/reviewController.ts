@@ -5,6 +5,8 @@ import { db } from '../services/databaseService.js';
 import { v2 as cloudinary } from 'cloudinary';
 import crypto from 'crypto';
 
+// Cloudinary is configured centrally in server.ts
+
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 
 function checkAdmin(req: any) {
@@ -26,11 +28,28 @@ export async function validateToken(req: Request, res: Response) {
   if (tokenUsed) {
     return res.json({ valid: false, tokenUsed: true, customerName: order.customerName, orderId: order.orderId });
   }
-  return res.json({ valid: true, customerName: order.customerName, orderId: order.orderId, lineItems: order.lineItems });
+  // Exponer formatos aceptados para que el frontend los muestre
+  const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const acceptedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+  return res.json({ valid: true, customerName: order.customerName, orderId: order.orderId, lineItems: order.lineItems, acceptedMimeTypes, acceptedExtensions });
 }
 
 export async function submitReview(req: Request, res: Response) {
   try {
+    // Validate Cloudinary configuration early to provide a clearer error than a generic 401
+    try {
+      const cfg = cloudinary.config();
+      // cloudinary.config() may return an object with cloud_name or undefined depending on env
+      const cloudName = (cfg && (cfg as any).cloud_name) || process.env.CLOUDINARY_CLOUD_NAME || (process.env.CLOUDINARY_URL ? (process.env.CLOUDINARY_URL.split('@')[1] || '').trim() : '');
+      if (!cloudName) {
+        console.error('Cloudinary configuration missing cloud_name:', cloudName);
+        return res.status(500).json({ error: 'Cloudinary configuration missing', detail: `No cloud_name configured for Cloudinary. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME in environment.` });
+      }
+    } catch (cfgErr) {
+      console.error('Error reading Cloudinary config', cfgErr);
+      return res.status(500).json({ error: 'Cloudinary configuration error', detail: String(cfgErr && (cfgErr as any).message ? (cfgErr as any).message : cfgErr) });
+    }
+
     const token = req.params.token;
     if (!token) return res.status(400).json({ error: 'Token requerido' });
 
@@ -49,11 +68,12 @@ export async function submitReview(req: Request, res: Response) {
     }
 
     const reviewsPayload = JSON.parse(req.body.payload || '[]');
-    const files: any[] = (req as any).files ? (Array.isArray((req as any).files) ? (req as any).files : Object.values((req as any).files).flat()) : [];
+  const files: any[] = (req as any).files ? (Array.isArray((req as any).files) ? (req as any).files : Object.values((req as any).files).flat()) : [];
 
     const totalBytes = files.reduce((s, f) => s + (f.size || 0), 0);
     if (totalBytes > MAX_TOTAL_IMAGE_BYTES) return res.status(400).json({ error: 'Las imágenes exceden el tamaño máximo permitido' });
 
+    // Agrupar archivos por fieldname (pueden venir como product-<productId>-<idx>)
     const grouped: Record<string, any[]> = {};
     for (const f of files) {
       const field = f.fieldname || 'default';
@@ -77,8 +97,15 @@ export async function submitReview(req: Request, res: Response) {
 
     const savedReviews: any[] = [];
 
+    // Formatos permitidos
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
+
     for (const r of reviewsPayload) {
-      const photosForField = grouped[`product-${r.productId}`] || [];
+      // soportar keys como product-<productId>-<idx> o product-<productId>
+      const photosForField = Object.entries(grouped)
+        .filter(([k]) => k.startsWith(`product-${r.productId}`))
+        .map(([_, arr]) => arr)
+        .flat();
 
       const reviewDoc = new Review({
         orderId: order.orderId,
@@ -94,12 +121,30 @@ export async function submitReview(req: Request, res: Response) {
 
       const photoUrls: string[] = [];
       for (const [idx, f] of photosForField.slice(0,5).entries()) {
+        // Validar mimetype
+        const mimetype = (f.mimetype || '').toString().toLowerCase();
+        if (!allowedMime.includes(mimetype)) {
+          return res.status(400).json({ error: `Formato de imagen no admitido (${mimetype}). Sólo se aceptan JPG, PNG o WebP.` });
+        }
+
+        // Convertir a WebP siempre para homogeneizar
         const webpBuffer = await sharp(f.buffer).webp({ quality: 75 }).toBuffer();
-        const uploadResult = await cloudinary.uploader.upload(`data:image/webp;base64,${webpBuffer.toString('base64')}`, {
-          folder: `cunao/reviews/${reviewDoc._id}`,
-          public_id: `review_${reviewDoc._id}_img_${idx}`,
-          format: 'webp'
-        });
+
+        // Subir a Cloudinary en la carpeta cunao/reviews/:review_id
+        let uploadResult: any;
+        try {
+          uploadResult = await cloudinary.uploader.upload(`data:image/webp;base64,${webpBuffer.toString('base64')}`, {
+            folder: `cunao/reviews/${reviewDoc._id}`,
+            public_id: `review_${reviewDoc._id}_img_${idx}`,
+            format: 'webp',
+            overwrite: true,
+            resource_type: 'image'
+          });
+        } catch (uploadErr: any) {
+          console.error('Cloudinary upload error', uploadErr && uploadErr.message ? uploadErr.message : uploadErr);
+          const msg = uploadErr && uploadErr.message ? uploadErr.message : 'Error uploading to Cloudinary';
+          return res.status(uploadErr && uploadErr.http_code ? uploadErr.http_code : 502).json({ error: 'Cloudinary upload failed', detail: msg });
+        }
         if (uploadResult && uploadResult.secure_url) photoUrls.push(uploadResult.secure_url);
       }
 
