@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
@@ -59,6 +60,9 @@ app.use('/api/reviews', reviewsRoutes);
 //    Esto se aplicará a todas las demás rutas que sí necesitan un body en formato JSON.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Parse cookies (necesario para autenticación por cookie)
+app.use(cookieParser());
 
 // Rutas que requieren body parser (JSON)
 app.use('/api/admin', adminRoutes);

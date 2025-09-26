@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { RequestHandler } from 'express';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'please_change_me';
 
@@ -15,6 +16,8 @@ export async function adminAuth(req: AuthRequest, res: Response, next: NextFunct
     if (authHeader.startsWith('Bearer ')) token = authHeader.slice(7).trim();
     // fallback to x-admin-token header
     if (!token) token = (req.headers['x-admin-token'] as string) || undefined;
+    // fallback to cookie adminToken
+    if (!token && (req as any).cookies) token = (req as any).cookies['adminToken'];
 
     if (!token) return res.status(401).json({ error: 'No token provided' });
 
@@ -30,3 +33,16 @@ export async function adminAuth(req: AuthRequest, res: Response, next: NextFunct
     return res.status(401).json({ error: 'Unauthorized', detail: e && e.message ? e.message : String(e) });
   }
 }
+
+// Middleware para protección CSRF (double-submit cookie)
+export const csrfProtection: RequestHandler = (req, res, next) => {
+  const method = req.method.toUpperCase();
+  // Solo validar en métodos que mutan estado
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const cookieToken = (req as any).cookies?.csrfToken;
+    const headerToken = (req.headers['x-csrf-token'] as string) || (req.headers['x-xsrf-token'] as string) || undefined;
+    if (!cookieToken || !headerToken) return res.status(403).json({ error: 'CSRF token missing' });
+    if (cookieToken !== headerToken) return res.status(403).json({ error: 'CSRF token mismatch' });
+  }
+  next();
+};

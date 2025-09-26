@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '../services/databaseService.js';
+import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'please_change_me';
 
@@ -57,9 +58,59 @@ export async function login(req: Request, res: Response) {
     if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const token = jwt.sign({ userId: user._id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '12h' });
-    return res.json({ token });
+
+    // Generar csrf token para double-submit cookie
+    const csrfToken = crypto.randomBytes(24).toString('hex');
+
+    // Setear cookie de sesión (HttpOnly) y cookie csrf (no HttpOnly para que el frontend la lea)
+    const secure = process.env.NODE_ENV === 'production';
+    // Si no estamos en production y usamos http, los navegadores rechazan SameSite=None sin Secure.
+    const sameSiteVal: 'none' | 'lax' = secure ? 'none' : 'lax';
+    res.cookie('adminToken', token, {
+      httpOnly: true,
+      secure,
+      sameSite: sameSiteVal,
+      maxAge: 12 * 60 * 60 * 1000, // 12 horas
+      path: '/'
+    });
+    res.cookie('csrfToken', csrfToken, {
+      httpOnly: false,
+      secure,
+      sameSite: sameSiteVal,
+      maxAge: 12 * 60 * 60 * 1000,
+      path: '/'
+    });
+
+    return res.json({ ok: true });
   } catch (e: any) {
     console.error('admin login error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function logout(req: Request, res: Response) {
+  try {
+  const secure = process.env.NODE_ENV === 'production';
+  const sameSiteVal: 'none' | 'lax' = secure ? 'none' : 'lax';
+  res.clearCookie('adminToken', { path: '/', secure, sameSite: sameSiteVal });
+  res.clearCookie('csrfToken', { path: '/', secure, sameSite: sameSiteVal });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('logout error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function me(req: Request, res: Response) {
+  try {
+    // adminAuth llenará req.user
+    // Si no hay usuario, devolvemos 401
+    // @ts-ignore
+    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+    // @ts-ignore
+    return res.json({ user: { id: req.user.id, email: req.user.email, role: req.user.role } });
+  } catch (e) {
+    console.error('me error', e);
     return res.status(500).json({ error: 'Error interno' });
   }
 }
