@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
 import { db } from '../services/databaseService.js';
 import crypto from 'crypto';
+import sharp from 'sharp';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'please_change_me';
 
@@ -182,10 +183,37 @@ export async function deleteReviewAdmin(req: Request, res: Response) {
 // Endpoint para crear review manualmente (admin)
 export async function createReviewAdmin(req: Request, res: Response) {
   try {
-    const { orderId, productId, rating, title, body, authorName } = req.body;
+    const { orderId, productId, rating, title, body, authorName, status } = req.body;
     if (!productId || !rating) return res.status(400).json({ error: 'productId y rating requeridos' });
-    const review = new Review({ orderId: orderId || 'admin', productId, rating, title, body, authorName: authorName || 'Admin', photos: [], status: 'published' });
+    const review = new Review({ orderId: orderId || 'admin', productId, rating: Number(rating), title, body, authorName: authorName || 'Admin', photos: [], status: status === 'published' ? 'published' : 'pending' });
     await review.save();
+
+    // Procesar imágenes si vienen (upload.any en la ruta)
+    const files: any[] = (req as any).files ? (Array.isArray((req as any).files) ? (req as any).files : Object.values((req as any).files).flat()) : [];
+    const allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
+    const photoUrls: string[] = [];
+    for (const [idx, f] of files.slice(0,5).entries()) {
+      const mimetype = (f.mimetype || '').toString().toLowerCase();
+      if (!allowedMime.includes(mimetype)) continue;
+      const webpBuffer = await sharp(f.buffer).webp({ quality: 75 }).toBuffer();
+      try {
+        const uploadResult = await cloudinary.uploader.upload(`data:image/webp;base64,${webpBuffer.toString('base64')}`, {
+          folder: `cunao/reviews/${review._id}`,
+          public_id: `review_${review._id}_img_${idx}`,
+          format: 'webp',
+          overwrite: true,
+          resource_type: 'image'
+        });
+        if (uploadResult && uploadResult.secure_url) photoUrls.push(uploadResult.secure_url);
+      } catch (e) {
+        console.warn('Cloudinary upload admin create warning', e);
+      }
+    }
+    if (photoUrls.length > 0) {
+      review.photos = photoUrls;
+      await review.save();
+    }
+
     return res.json({ success: true, review });
   } catch (e) {
     console.error(e);
