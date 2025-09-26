@@ -18,6 +18,7 @@ import weeklyProductsRoutes from './routes/weeklyProducts.js';
 import discountRoutes from './routes/discounts.js';
 import imageRoutes from './routes/images.js';
 import reviewsRoutes from './routes/reviews.js';
+import adminRoutes from './routes/admin.js';
 import { db } from './services/databaseService.js';
 import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
@@ -58,6 +59,9 @@ app.use('/api/reviews', reviewsRoutes);
 //    Esto se aplicará a todas las demás rutas que sí necesitan un body en formato JSON.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Rutas que requieren body parser (JSON)
+app.use('/api/admin', adminRoutes);
 
 // --- FIN DE LA CORRECCIÓN ---
 
