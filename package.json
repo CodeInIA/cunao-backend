@@ -11,6 +11,7 @@
     "test": "jest",
     "heroku-postbuild": "npm run build",
     "cancel-orders": "tsx src/cron/cancelAllPrintifyOrders.ts",
+    "cleanup-orders": "tsx src/cron/cleanupExpiredOrders.ts",
     "create-discount": "tsx src/cron/createDiscountCode.ts",
     "migrate-images": "tsx src/scripts/migrateImages.ts"
   },
