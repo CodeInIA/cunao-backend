@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import sharp from 'sharp';
 import Review from '../models/Review.js';
+import { getOptimizedImageUrl, getVariantImage, getMainProductImage } from '../utils/imageUtils.js';
 import { db } from '../services/databaseService.js';
 import { v2 as cloudinary } from 'cloudinary';
 import crypto from 'crypto';
@@ -59,9 +60,62 @@ async function enrichReviewsWithProductInfo(reviews: any[]) {
     if (prod) {
       out.productTitle = prod.title || '';
       out.productSlug = slugify(prod.title || '');
+
+      // Preferir información guardada en la review (size/color/quantity) si existe
+      out.color = out.color || out.variantColor || out.colorName || out.color || undefined;
+      out.size = out.size || out.variantSize || out.size || undefined;
+      out.quantity = out.quantity || out.quantity === 0 ? out.quantity : undefined;
+
+      // Resolver imagen: intentar por variantId -> por opciones (color/size) -> fallback a imagen principal
+      let chosenImage: any = null;
+      try {
+        if (out.variantId) {
+          chosenImage = getVariantImage(prod.images || [], Number(out.variantId));
+        }
+        // si no encontrada y se tienen color/size, intentar buscar variante por título o ids
+        if (!chosenImage) {
+          const colorTitle = out.color || '';
+          const sizeTitle = out.size || '';
+          const normalize = (s: any) => (s || '').toString().trim().toLowerCase();
+
+          if (Array.isArray(prod.variants) && colorTitle && sizeTitle) {
+            const candidateTitle = `${colorTitle} / ${sizeTitle}`;
+            const foundByTitle = prod.variants.find((v: any) => normalize(v.title) === normalize(candidateTitle));
+            if (foundByTitle) chosenImage = getVariantImage(prod.images || [], foundByTitle.id);
+          }
+
+          // fallback por option ids
+          if (!chosenImage && Array.isArray(prod.options)) {
+            let colorId: number | null = null;
+            let sizeId: number | null = null;
+            for (const opt of prod.options) {
+              const optType = (opt.type || opt.name || '').toString().toLowerCase();
+              if (optType.includes('color')) {
+                const found = (opt.values || []).find((v: any) => normalize(v.title) === normalize(colorTitle));
+                if (found) colorId = found.id;
+              }
+              if (optType.includes('size')) {
+                const found = (opt.values || []).find((v: any) => normalize(v.title) === normalize(sizeTitle));
+                if (found) sizeId = found.id;
+              }
+            }
+            if (colorId != null && sizeId != null && Array.isArray(prod.variants)) {
+              const foundVariant = prod.variants.find((v: any) => Array.isArray(v.options) && v.options.includes(colorId) && v.options.includes(sizeId));
+              if (foundVariant) chosenImage = getVariantImage(prod.images || [], foundVariant.id);
+            }
+          }
+        }
+
+              // Determine metadata from the order's lineItems whenever possible
+      } catch (e) {
+        chosenImage = getMainProductImage(prod.images || []);
+      }
+
+      out.imageUrl = chosenImage ? getOptimizedImageUrl(chosenImage) : undefined;
     } else {
       out.productTitle = undefined;
       out.productSlug = undefined;
+      out.imageUrl = undefined;
     }
     return out;
   });
@@ -82,6 +136,8 @@ export async function validateToken(req: Request, res: Response) {
     return res.json({ valid: false, tokenUsed: true, customerName: order.customerName, orderId: order.orderId });
   }
   // Exponer formatos aceptados para que el frontend los muestre
+              // Track which grouped field keys (form fieldnames) we've already assigned to a review
+              const usedFileFieldKeys = new Set<string>();
   const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
   const acceptedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
   return res.json({ valid: true, customerName: order.customerName, orderId: order.orderId, lineItems: order.lineItems, acceptedMimeTypes, acceptedExtensions });
@@ -148,27 +204,46 @@ export async function submitReview(req: Request, res: Response) {
       return res.status(400).json({ error: 'Validation failed', validationErrors });
     }
 
-    const savedReviews: any[] = [];
+  const savedReviews: any[] = [];
+  // track which order line indexes we've already used when matching by productId
+  const usedLineIndexes = new Set<number>();
 
     // Formatos permitidos
     const allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
 
+    // Track which grouped field keys (form fieldnames) we've already assigned to a review
+    const usedFileFieldKeys = new Set<string>();
+
     for (const r of reviewsPayload) {
-      // soportar keys como product-<productId>-<idx> o product-<productId> o product-<fieldKey>
-      let photosForField: any[] = [];
-      if (r.fieldKey) {
-        // buscar coincidencias exactas que empiecen por product-<fieldKey>
-        photosForField = Object.entries(grouped)
-          .filter(([k]) => k.startsWith(`product-${r.fieldKey}`))
-          .map(([_, arr]) => arr)
-          .flat();
-      }
-      // fallback al comportamiento anterior (por productId) si no hay fieldKey o no se encontraron archivos
-      if ((!photosForField || photosForField.length === 0) && r.productId) {
-        photosForField = Object.entries(grouped)
-          .filter(([k]) => k.startsWith(`product-${r.productId}`))
-          .map(([_, arr]) => arr)
-          .flat();
+
+      // Determine metadata from the order's lineItems whenever possible
+      let fieldKeySaved: string | undefined = undefined;
+      let variantIdSaved: number | undefined = undefined;
+      let sizeSaved: string | undefined = undefined;
+      let colorSaved: string | undefined = undefined;
+      let quantitySaved: number | undefined = undefined;
+
+      try {
+        // Always determine metadata server-side: find the first unused order.lineItems entry
+        // that matches the productId from the payload. Do NOT trust metadata sent by frontend.
+        if (r && r.productId && order && Array.isArray(order.lineItems)) {
+          for (let i = 0; i < order.lineItems.length; i++) {
+            if (usedLineIndexes.has(i)) continue;
+            const li = order.lineItems[i];
+            if (!li) continue;
+            if (String(li.productId) === String(r.productId)) {
+              fieldKeySaved = `${li.productId}-${i}`;
+              variantIdSaved = li.variantId;
+              sizeSaved = li.size;
+              colorSaved = li.color;
+              quantitySaved = li.quantity;
+              usedLineIndexes.add(i);
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore and continue with undefined metadata
       }
 
       const reviewDoc = new Review({
@@ -179,9 +254,42 @@ export async function submitReview(req: Request, res: Response) {
         body: r.body,
         authorName: r.authorName || order.customerName || 'Anónimo',
         photos: [],
-        status: 'pending'
+        status: 'pending',
+        // metadata populated server-side when possible
+        fieldKey: fieldKeySaved || r.fieldKey,
+        variantId: variantIdSaved,
+        size: sizeSaved,
+        color: colorSaved,
+        quantity: quantitySaved
       });
       await reviewDoc.save();
+
+      // Seleccionar fotos asociadas a esta review (server-side) y evitar reasignarlas
+      let photosForField: any[] = [];
+      try {
+        const effectiveFieldKey = fieldKeySaved; // server-determined key like <productId>-<idx>
+        if (effectiveFieldKey) {
+          const key = `product-${effectiveFieldKey}`;
+          if (grouped[key] && !usedFileFieldKeys.has(key)) {
+            photosForField = photosForField.concat(grouped[key]);
+            usedFileFieldKeys.add(key);
+          }
+        }
+
+        // fallback: usar la primera key no usada que empiece por product-<productId>
+        if (photosForField.length === 0 && r.productId) {
+          const prefix = `product-${r.productId}`;
+          for (const [k, arr] of Object.entries(grouped)) {
+            if (k.startsWith(prefix) && !usedFileFieldKeys.has(k)) {
+              photosForField = photosForField.concat(arr);
+              usedFileFieldKeys.add(k);
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
 
       const photoUrls: string[] = [];
       for (const [idx, f] of photosForField.slice(0,5).entries()) {

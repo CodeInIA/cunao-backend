@@ -7,6 +7,12 @@ export interface IReview extends Document {
   title?: string;
   body?: string;
   authorName: string;
+  // Información de la línea de pedido asociada (opcional, se guarda al crear la review)
+  fieldKey?: string;
+  variantId?: number;
+  size?: string;
+  color?: string;
+  quantity?: number;
   photos: string[]; // URLs en Cloudinary
   status: 'pending' | 'published' | 'rejected';
   createdAt: Date;
@@ -16,6 +22,12 @@ export interface IReview extends Document {
 const ReviewSchema: Schema = new Schema({
   orderId: { type: String, required: true, index: true },
   productId: { type: String, required: true, index: true },
+  // Información de la línea de pedido (guardada opcionalmente para facilitar el enriquecimiento)
+  fieldKey: { type: String },
+  variantId: { type: Number },
+  size: { type: String },
+  color: { type: String },
+  quantity: { type: Number },
   rating: { type: Number, required: true, min: 1, max: 5 },
   title: { type: String },
   body: { type: String },
