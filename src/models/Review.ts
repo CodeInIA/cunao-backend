@@ -4,7 +4,6 @@ export interface IReview extends Document {
   orderId: string; // referencia a la order
   productId: string;
   rating: number; // 1-5
-  title?: string;
   body?: string;
   authorName: string;
   // Información de la línea de pedido asociada (opcional, se guarda al crear la review)
@@ -29,7 +28,6 @@ const ReviewSchema: Schema = new Schema({
   color: { type: String },
   quantity: { type: Number },
   rating: { type: Number, required: true, min: 1, max: 5 },
-  title: { type: String },
   body: { type: String },
   authorName: { type: String, required: true },
   photos: [{ type: String }],

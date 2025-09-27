@@ -250,7 +250,6 @@ export async function submitReview(req: Request, res: Response) {
         orderId: order.orderId,
         productId: r.productId,
         rating: r.rating,
-        title: r.title,
         body: r.body,
         authorName: r.authorName || order.customerName || 'Anónimo',
         photos: [],
