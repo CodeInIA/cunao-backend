@@ -136,8 +136,6 @@ export async function validateToken(req: Request, res: Response) {
     return res.json({ valid: false, tokenUsed: true, customerName: order.customerName, orderId: order.orderId });
   }
   // Exponer formatos aceptados para que el frontend los muestre
-              // Track which grouped field keys (form fieldnames) we've already assigned to a review
-              const usedFileFieldKeys = new Set<string>();
   const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
   const acceptedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
   return res.json({ valid: true, customerName: order.customerName, orderId: order.orderId, lineItems: order.lineItems, acceptedMimeTypes, acceptedExtensions });
@@ -208,100 +206,125 @@ export async function submitReview(req: Request, res: Response) {
   // track which order line indexes we've already used when matching by productId
   const usedLineIndexes = new Set<number>();
 
-    // Formatos permitidos
+  // Formatos permitidos
     const allowedMime = ['image/jpeg', 'image/png', 'image/webp'];
 
     // Track which grouped field keys (form fieldnames) we've already assigned to a review
     const usedFileFieldKeys = new Set<string>();
 
-    for (const r of reviewsPayload) {
+  // (debug logs removed)
 
-      // Determine metadata from the order's lineItems whenever possible
-      let fieldKeySaved: string | undefined = undefined;
-      let variantIdSaved: number | undefined = undefined;
-      let sizeSaved: string | undefined = undefined;
-      let colorSaved: string | undefined = undefined;
-      let quantitySaved: number | undefined = undefined;
+  // Two-phase approach: first create review docs and collect metadata, then assign files
+  const reviewMetas: { payload: any; reviewDoc: any; fieldKeySaved?: string; productId?: string; assigned?: boolean }[] = [];
 
-      try {
-        // Always determine metadata server-side: find the first unused order.lineItems entry
-        // that matches the productId from the payload. Do NOT trust metadata sent by frontend.
-        if (r && r.productId && order && Array.isArray(order.lineItems)) {
-          for (let i = 0; i < order.lineItems.length; i++) {
-            if (usedLineIndexes.has(i)) continue;
-            const li = order.lineItems[i];
-            if (!li) continue;
-            if (String(li.productId) === String(r.productId)) {
-              fieldKeySaved = `${li.productId}-${i}`;
-              variantIdSaved = li.variantId;
-              sizeSaved = li.size;
-              colorSaved = li.color;
-              quantitySaved = li.quantity;
-              usedLineIndexes.add(i);
-              break;
-            }
+  for (const r of reviewsPayload) {
+    // Determine metadata from the order's lineItems whenever possible
+    let fieldKeySaved: string | undefined = undefined;
+    let variantIdSaved: number | undefined = undefined;
+    let sizeSaved: string | undefined = undefined;
+    let colorSaved: string | undefined = undefined;
+    let quantitySaved: number | undefined = undefined;
+
+    try {
+      if (r && r.productId && order && Array.isArray(order.lineItems)) {
+        for (let i = 0; i < order.lineItems.length; i++) {
+          if (usedLineIndexes.has(i)) continue;
+          const li = order.lineItems[i];
+          if (!li) continue;
+          if (String(li.productId) === String(r.productId)) {
+            fieldKeySaved = `${li.productId}-${i}`;
+            variantIdSaved = li.variantId;
+            sizeSaved = li.size;
+            colorSaved = li.color;
+            quantitySaved = li.quantity;
+            usedLineIndexes.add(i);
+            break;
           }
         }
-      } catch (e) {
-        // ignore and continue with undefined metadata
       }
+    } catch (e) {
+      // ignore
+    }
 
-      const reviewDoc = new Review({
-        orderId: order.orderId,
-        productId: r.productId,
-        rating: r.rating,
-        body: r.body,
-        authorName: r.authorName || order.customerName || 'Anónimo',
-        photos: [],
-        status: 'pending',
-        // metadata populated server-side when possible
-        fieldKey: fieldKeySaved || r.fieldKey,
-        variantId: variantIdSaved,
-        size: sizeSaved,
-        color: colorSaved,
-        quantity: quantitySaved
-      });
-      await reviewDoc.save();
+    const reviewDoc = new Review({
+      orderId: order.orderId,
+      productId: r.productId,
+      rating: r.rating,
+      body: r.body,
+      authorName: r.authorName || order.customerName || 'Anónimo',
+      photos: [],
+      status: 'pending',
+      fieldKey: fieldKeySaved || r.fieldKey,
+      variantId: variantIdSaved,
+      size: sizeSaved,
+      color: colorSaved,
+      quantity: quantitySaved
+    });
+    await reviewDoc.save();
+  // metadata resolved from order.lineItems (no debug logs)
 
-      // Seleccionar fotos asociadas a esta review (server-side) y evitar reasignarlas
-      let photosForField: any[] = [];
-      try {
-        const effectiveFieldKey = fieldKeySaved; // server-determined key like <productId>-<idx>
-        if (effectiveFieldKey) {
-          const key = `product-${effectiveFieldKey}`;
-          if (grouped[key] && !usedFileFieldKeys.has(key)) {
-            photosForField = photosForField.concat(grouped[key]);
-            usedFileFieldKeys.add(key);
-          }
-        }
+    reviewMetas.push({ payload: r, reviewDoc, fieldKeySaved, productId: r.productId, assigned: false });
+  }
 
-        // fallback: usar la primera key no usada que empiece por product-<productId>
-        if (photosForField.length === 0 && r.productId) {
-          const prefix = `product-${r.productId}`;
-          for (const [k, arr] of Object.entries(grouped)) {
-            if (k.startsWith(prefix) && !usedFileFieldKeys.has(k)) {
-              photosForField = photosForField.concat(arr);
-              usedFileFieldKeys.add(k);
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        // ignore
+  // Preprocess grouped keys
+  const parsedKeys: { key: string; productId: string; idx?: number }[] = Object.keys(grouped).map(k => {
+    const withoutPrefix = k.startsWith('product-') ? k.slice('product-'.length) : k;
+    const parts = withoutPrefix.split('-');
+    let idx: number | undefined = undefined;
+    if (parts.length > 1) {
+      const last = parts[parts.length - 1];
+      const num = Number(last);
+      if (!Number.isNaN(num)) {
+        idx = num;
+        parts.pop();
       }
+    }
+    return { key: k, productId: parts.join('-'), idx };
+  });
 
-      const photoUrls: string[] = [];
-      for (const [idx, f] of photosForField.slice(0,5).entries()) {
-        // Validar mimetype
+  // Assign files by iterating reviews and matching exact fieldKey when possible.
+  // This prevents ambiguous assignment when multiple lineItems share the same productId.
+  for (const meta of reviewMetas) {
+    const r = meta.payload;
+    const reviewDoc = meta.reviewDoc;
+    let assignedUrls: string[] = [];
+
+    // prefer server-determined fieldKey (contains index)
+    const candidates: string[] = [];
+    if (meta.fieldKeySaved) candidates.push(`product-${meta.fieldKeySaved}`);
+    // allow payload-provided fieldKey as a secondary exact match
+    if (r && r.fieldKey) candidates.push(`product-${r.fieldKey}`);
+
+    let matchedKey: string | undefined = undefined;
+    for (const c of candidates) {
+      if (grouped[c] && !usedFileFieldKeys.has(c)) {
+        matchedKey = c;
+        break;
+      }
+    }
+
+    if (!matchedKey) {
+      // If no exact indexed key found, check for an unindexed key (product-<productId>)
+      const unindexedKey = `product-${meta.productId}`;
+      if (grouped[unindexedKey] && !usedFileFieldKeys.has(unindexedKey)) {
+        // Only assign unindexed key when there is a single review for this productId
+        const matchesForProduct = reviewMetas.filter(m => String(m.productId) === String(meta.productId));
+        if (matchesForProduct.length === 1) {
+          matchedKey = unindexedKey;
+        } else {
+          console.debug('[reviews] ambiguous unindexed key for productId, skipping assignment', unindexedKey, 'reviewsForProduct:', matchesForProduct.length);
+        }
+      }
+    }
+
+    if (matchedKey) {
+      const filesForKey = grouped[matchedKey] || [];
+      for (const [idx, f] of filesForKey.slice(0,5).entries()) {
         const mimetype = (f.mimetype || '').toString().toLowerCase();
         if (!allowedMime.includes(mimetype)) {
           return res.status(400).json({ error: `Formato de imagen no admitido (${mimetype}). Sólo se aceptan JPG, PNG o WebP.` });
         }
-
-        // Convertir a WebP siempre para homogeneizar
         const webpBuffer = await sharp(f.buffer).webp({ quality: 75 }).toBuffer();
-
-        // Subir a Cloudinary en la carpeta cunao/reviews/:review_id
         let uploadResult: any;
         try {
           uploadResult = await cloudinary.uploader.upload(`data:image/webp;base64,${webpBuffer.toString('base64')}`, {
@@ -316,13 +339,20 @@ export async function submitReview(req: Request, res: Response) {
           const msg = uploadErr && uploadErr.message ? uploadErr.message : 'Error uploading to Cloudinary';
           return res.status(uploadErr && uploadErr.http_code ? uploadErr.http_code : 502).json({ error: 'Cloudinary upload failed', detail: msg });
         }
-        if (uploadResult && uploadResult.secure_url) photoUrls.push(uploadResult.secure_url);
+        if (uploadResult && uploadResult.secure_url) assignedUrls.push(uploadResult.secure_url);
       }
 
-      reviewDoc.photos = photoUrls;
-      await reviewDoc.save();
-      savedReviews.push(reviewDoc);
+      if (assignedUrls.length > 0) {
+        reviewDoc.photos = assignedUrls;
+        await reviewDoc.save();
+        meta.assigned = true;
+        usedFileFieldKeys.add(matchedKey);
+        savedReviews.push(reviewDoc);
+      }
+    } else {
+      // no grouped key matched for this review
     }
+  }
 
     // Mark the review token as used so the same token cannot be reused to submit again
     try {
