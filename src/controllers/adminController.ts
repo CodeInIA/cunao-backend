@@ -185,9 +185,26 @@ export async function deleteReviewAdmin(req: Request, res: Response) {
 // Endpoint para crear review manualmente (admin)
 export async function createReviewAdmin(req: Request, res: Response) {
   try {
-    const { orderId, productId, rating, title, body, authorName, status } = req.body;
+    const { orderId, productId, rating, title, body, authorName, status, color, size, quantity, variantId } = req.body;
     if (!productId || !rating) return res.status(400).json({ error: 'productId y rating requeridos' });
-    const review = new Review({ orderId: orderId || 'admin', productId, rating: Number(rating), title, body, authorName: authorName || 'Admin', photos: [], status: status === 'published' ? 'published' : 'pending' });
+    const reviewData: any = {
+      orderId: orderId || 'admin',
+      productId,
+      rating: Number(rating),
+      title,
+      body,
+      authorName: authorName || 'Admin',
+      photos: [],
+      status: status === 'published' ? 'published' : 'pending'
+    };
+
+    // Optionally include product metadata if provided from the admin form
+    if (color) reviewData.color = String(color);
+    if (size) reviewData.size = String(size);
+    if (quantity !== undefined && quantity !== null && quantity !== '') reviewData.quantity = Number(quantity);
+    if (variantId) reviewData.variantId = String(variantId);
+
+    const review = new Review(reviewData);
     await review.save();
 
     // Procesar imágenes si vienen (upload.any en la ruta)
