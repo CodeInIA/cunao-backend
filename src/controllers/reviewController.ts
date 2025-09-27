@@ -45,7 +45,7 @@ function slugify(text: string) {
     .replace(/^-+|-+$/g, '');
 }
 
-async function enrichReviewsWithProductInfo(reviews: any[]) {
+export async function enrichReviewsWithProductInfo(reviews: any[]) {
   const plain = reviews.map(r => (r && typeof r.toObject === 'function' ? r.toObject() : (r._doc ? r._doc : { ...r })));
   const productIds = Array.from(new Set(plain.map(p => p.productId).filter(Boolean)));
   const productPromises = productIds.map(pid => db.getProductByPrintifyId(String(pid)).catch(() => null));

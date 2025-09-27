@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from '../models/User.js';
 import Review from '../models/Review.js';
+import { enrichReviewsWithProductInfo } from './reviewController.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v2 as cloudinary } from 'cloudinary';
@@ -122,7 +123,8 @@ export async function listReviewsAdmin(req: Request, res: Response) {
     const q: any = {};
     if (status) q.status = status;
     const reviews = await Review.find(q).sort({ createdAt: -1 }).limit(200).exec();
-    return res.json({ reviews });
+    const enriched = await enrichReviewsWithProductInfo(reviews as any[]);
+    return res.json({ reviews: enriched });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: 'Error interno' });
