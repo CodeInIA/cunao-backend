@@ -69,19 +69,26 @@ export async function login(req: Request, res: Response) {
     const secure = process.env.NODE_ENV === 'production';
     // Si no estamos en production y usamos http, los navegadores rechazan SameSite=None sin Secure.
     const sameSiteVal: 'none' | 'lax' = secure ? 'none' : 'lax';
-    res.cookie('adminToken', token, {
-      httpOnly: true,
-      secure,
-      sameSite: sameSiteVal,
-      maxAge: 12 * 60 * 60 * 1000, // 12 horas
-      path: '/'
-    });
-    res.cookie('csrfToken', csrfToken, {
-      httpOnly: false,
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined; // e.g. '.cunadismoilustrado.me'
+
+    // Log de depuración para producción: opciones de cookie que se usarán
+    console.log('Setting admin cookies - secure:', secure, 'sameSite:', sameSiteVal, 'domain:', cookieDomain);
+
+    const baseCookieOptions: any = {
       secure,
       sameSite: sameSiteVal,
       maxAge: 12 * 60 * 60 * 1000,
       path: '/'
+    };
+    if (cookieDomain) baseCookieOptions.domain = cookieDomain;
+
+    res.cookie('adminToken', token, {
+      ...baseCookieOptions,
+      httpOnly: true
+    });
+    res.cookie('csrfToken', csrfToken, {
+      ...baseCookieOptions,
+      httpOnly: false
     });
 
     return res.json({ ok: true });
@@ -95,8 +102,12 @@ export async function logout(req: Request, res: Response) {
   try {
   const secure = process.env.NODE_ENV === 'production';
   const sameSiteVal: 'none' | 'lax' = secure ? 'none' : 'lax';
-  res.clearCookie('adminToken', { path: '/', secure, sameSite: sameSiteVal });
-  res.clearCookie('csrfToken', { path: '/', secure, sameSite: sameSiteVal });
+  const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+  const clearOpts: any = { path: '/', secure, sameSite: sameSiteVal };
+  if (cookieDomain) clearOpts.domain = cookieDomain;
+  console.log('Clearing admin cookies - secure:', secure, 'sameSite:', sameSiteVal, 'domain:', cookieDomain);
+  res.clearCookie('adminToken', clearOpts);
+  res.clearCookie('csrfToken', clearOpts);
     return res.json({ ok: true });
   } catch (e) {
     console.error('logout error', e);

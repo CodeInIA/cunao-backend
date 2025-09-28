@@ -47,6 +47,9 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+// Mostrar en el arranque qué orígenes están permitidos (útil para depuración en producción)
+console.log('CORS allowed origins:', allowedOrigins);
+
 // --- INICIO DE LA CORRECCIÓN ---
 
 // 1. Ruta de Webhooks PRIMERO.
