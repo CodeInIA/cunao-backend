@@ -71,8 +71,6 @@ export async function login(req: Request, res: Response) {
     const sameSiteVal: 'none' | 'lax' = secure ? 'none' : 'lax';
     const cookieDomain = process.env.COOKIE_DOMAIN || undefined; // e.g. '.cunadismoilustrado.me'
 
-    // Log de depuración para producción: opciones de cookie que se usarán
-    console.log('Setting admin cookies - secure:', secure, 'sameSite:', sameSiteVal, 'domain:', cookieDomain);
 
     const baseCookieOptions: any = {
       secure,
@@ -105,7 +103,6 @@ export async function logout(req: Request, res: Response) {
   const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
   const clearOpts: any = { path: '/', secure, sameSite: sameSiteVal };
   if (cookieDomain) clearOpts.domain = cookieDomain;
-  console.log('Clearing admin cookies - secure:', secure, 'sameSite:', sameSiteVal, 'domain:', cookieDomain);
   res.clearCookie('adminToken', clearOpts);
   res.clearCookie('csrfToken', clearOpts);
     return res.json({ ok: true });
