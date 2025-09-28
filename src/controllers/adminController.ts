@@ -8,6 +8,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { db } from '../services/databaseService.js';
 import crypto from 'crypto';
 import sharp from 'sharp';
+import printifyService from '../services/printifyService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'please_change_me';
 
@@ -127,6 +128,58 @@ export async function listReviewsAdmin(req: Request, res: Response) {
     return res.json({ reviews: enriched });
   } catch (e) {
     console.error(e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+// Listar productos (solo para admin) - devuelve imagen principal, title y tags
+export async function listProductsAdmin(req: Request, res: Response) {
+  try {
+    const limit = Number(req.query.limit) || 200;
+    const products = await db.getProducts(limit);
+    // mapear solo campos necesarios
+    const out = products.map(p => ({
+      id: p.printifyId,
+      title: p.title,
+      tags: p.tags || [],
+      image: Array.isArray(p.images) && p.images.length > 0 ? p.images.find((i: any) => i.is_default) || p.images[0] : null
+    }));
+    return res.json({ success: true, data: out });
+  } catch (e) {
+    console.error('listProductsAdmin error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+// Actualizar tags de producto: llama a Printify y si OK actualiza MongoDB
+export async function updateProductTagsAdmin(req: Request, res: Response) {
+  try {
+    const id = req.params.id; // printify product id
+    const tags = req.body && Array.isArray(req.body.tags) ? req.body.tags.map(String) : null;
+    if (!tags) return res.status(400).json({ error: 'tags array required' });
+
+    // Llamar a Printify
+    try {
+      const ok = await printifyService.getInstance().updateProductTags(id, tags);
+      if (!ok) {
+        console.error('Printify update tags returned not-ok');
+        return res.status(502).json({ error: 'Error updating printify product' });
+      }
+    } catch (e: any) {
+      console.error('Error calling Printify to update tags', e.response?.data || e.message || e);
+      return res.status(502).json({ error: 'Error updating printify product', details: e.response?.data || e.message });
+    }
+
+    // Si llegó aquí, actualizamos en DB
+    try {
+      await db.updateProductTags(id, tags);
+    } catch (err) {
+      console.error('Error updating DB tags', err);
+    }
+
+    return res.json({ success: true });
+  } catch (e) {
+    console.error('updateProductTagsAdmin error', e);
     return res.status(500).json({ error: 'Error interno' });
   }
 }

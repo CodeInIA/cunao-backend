@@ -371,6 +371,11 @@ class DatabaseService {
     return Product.findOne({ printifyId }).exec();
   }
 
+  // Actualizar solo tags de un producto
+  public async updateProductTags(printifyId: string, tags: string[]): Promise<IProduct | null> {
+    return Product.findOneAndUpdate({ printifyId }, { $set: { tags } }, { new: true }).exec();
+  }
+
   /**
    * Obtener un producto por su título slug
    */

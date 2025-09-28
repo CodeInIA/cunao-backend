@@ -14,6 +14,8 @@ router.post('/login', adminCtrl.login);
 
 // Protected admin routes
 router.get('/reviews', adminAuth, adminCtrl.listReviewsAdmin);
+router.get('/products', adminAuth, adminCtrl.listProductsAdmin);
+router.put('/products/:id/tags', adminAuth, csrfProtection, adminCtrl.updateProductTagsAdmin);
 router.post('/reviews/publish/:id', adminAuth, csrfProtection, adminCtrl.publishReviewAdmin);
 router.delete('/reviews/:id', adminAuth, csrfProtection, adminCtrl.deleteReviewAdmin);
 router.post('/reviews/create', adminAuth, csrfProtection, upload.any(), adminCtrl.createReviewAdmin);

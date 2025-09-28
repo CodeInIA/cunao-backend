@@ -162,6 +162,17 @@ class PrintifyService {
       throw new Error('Error al calcular gastos de envío');
     }
   }
+
+  // Actualizar tags de un producto en Printify
+  async updateProductTags(productId: string, tags: string[]): Promise<boolean> {
+    try {
+      const response = await this.api.put(`/shops/${this.shopId}/products/${productId}.json`, { tags });
+      return response.status === 200;
+    } catch (error: any) {
+      console.error(`Error al actualizar tags del producto ${productId} en Printify:`, error.response?.data || error.message || error);
+      throw error;
+    }
+  }
 }
 
 // Exportar una función que cree la instancia solo cuando se necesite
