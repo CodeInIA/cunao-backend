@@ -11,6 +11,7 @@ import { PrintifyProduct } from '../types/index.js';
 import Client from '../models/Client.js';
 import Newsletter from '../models/Newsletter.js';
 import WeeklyProduct from '../models/WeeklyProducts.js';
+import DiscountCode from '../models/DiscountCode.js';
 
 // --- Función slugify ---
 function slugify(text: string): string {
@@ -134,6 +135,23 @@ async function handleCheckoutCompleted(session: any) {
   if (!updatedOrder) {
     console.error('No se encontró la orden en la base de datos para actualizar por orderId:', orderId);
     return;
+  }
+
+  // Incrementar el contador de usos del cupón de descuento si se usó uno
+  if (updatedOrder.discountCode) {
+    try {
+      const discountCode = await DiscountCode.findOne({ code: updatedOrder.discountCode.toUpperCase() });
+      if (discountCode) {
+        discountCode.usedCount = (discountCode.usedCount || 0) + 1;
+        await discountCode.save();
+        console.log(`✅ Contador de usos actualizado para el cupón: ${discountCode.code} (${discountCode.usedCount}${discountCode.maxUses ? `/${discountCode.maxUses}` : ' usos'})`);
+      } else {
+        console.warn(`⚠️ No se encontró el cupón de descuento: ${updatedOrder.discountCode}`);
+      }
+    } catch (discountError) {
+      console.error('Error actualizando contador de usos del cupón:', discountError);
+      // No fallar el proceso completo por un error en el cupón
+    }
   }
 
   // Guardar o actualizar datos del cliente

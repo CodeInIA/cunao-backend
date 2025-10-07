@@ -597,6 +597,8 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
       expiryDate: code.expiryDate,
       isActive: code.isActive,
       appliesTo: code.appliesTo,
+      maxUses: code.maxUses,
+      usedCount: code.usedCount,
       createdAt: code.createdAt,
       updatedAt: code.updatedAt,
       isValid: code.isValid()
@@ -611,7 +613,7 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
 
 export async function createDiscountCodeAdmin(req: Request, res: Response) {
   try {
-    const { code, discountPercentage, expiryDate, isActive, appliesTo, sendEmail: sendEmailToSubscribers, customEmails } = req.body;
+    const { code, discountPercentage, expiryDate, isActive, appliesTo, maxUses, sendEmail: sendEmailToSubscribers, customEmails } = req.body;
     
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'El código es requerido' });
@@ -625,7 +627,8 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       code: code.trim().toUpperCase(),
       discountPercentage: Number(discountPercentage),
       isActive: isActive !== undefined ? Boolean(isActive) : true,
-      appliesTo: appliesTo || 'subtotal'
+      appliesTo: appliesTo || 'subtotal',
+      usedCount: 0
     };
 
     if (expiryDate) {
@@ -634,6 +637,14 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
         return res.status(400).json({ error: 'La fecha de expiración debe ser futura' });
       }
       discountData.expiryDate = date;
+    }
+
+    if (maxUses !== undefined && maxUses !== null) {
+      const uses = Number(maxUses);
+      if (!Number.isInteger(uses) || uses < 1) {
+        return res.status(400).json({ error: 'El número máximo de usos debe ser un número entero positivo' });
+      }
+      discountData.maxUses = uses;
     }
 
     const discountCode = new DiscountCode(discountData);
@@ -647,6 +658,8 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       expiryDate: discountCode.expiryDate,
       isActive: discountCode.isActive,
       appliesTo: discountCode.appliesTo,
+      maxUses: discountCode.maxUses,
+      usedCount: discountCode.usedCount,
       createdAt: discountCode.createdAt,
       updatedAt: discountCode.updatedAt,
       isValid: discountCode.isValid()
@@ -758,7 +771,7 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
 export async function updateDiscountCodeAdmin(req: Request, res: Response) {
   try {
     const id = req.params.id;
-    const { code, discountPercentage, expiryDate, isActive, appliesTo } = req.body;
+    const { code, discountPercentage, expiryDate, isActive, appliesTo, maxUses } = req.body;
 
     const discountCode = await DiscountCode.findById(id);
     if (!discountCode) {
@@ -796,6 +809,26 @@ export async function updateDiscountCodeAdmin(req: Request, res: Response) {
       discountCode.appliesTo = appliesTo;
     }
 
+    if (maxUses !== undefined) {
+      if (maxUses === null || maxUses === '') {
+        discountCode.maxUses = null;
+      } else {
+        const maxUsesNum = Number(maxUses);
+        if (!Number.isInteger(maxUsesNum) || maxUsesNum < 1) {
+          return res.status(400).json({ error: 'El número máximo de usos debe ser un entero positivo' });
+        }
+        
+        // Validar que maxUses no sea menor que usedCount
+        if (maxUsesNum < discountCode.usedCount) {
+          return res.status(400).json({ 
+            error: `El número máximo de usos no puede ser menor que los usos actuales (${discountCode.usedCount})` 
+          });
+        }
+        
+        discountCode.maxUses = maxUsesNum;
+      }
+    }
+
     await discountCode.save();
 
     return res.json({ 
@@ -807,6 +840,8 @@ export async function updateDiscountCodeAdmin(req: Request, res: Response) {
         expiryDate: discountCode.expiryDate,
         isActive: discountCode.isActive,
         appliesTo: discountCode.appliesTo,
+        maxUses: discountCode.maxUses,
+        usedCount: discountCode.usedCount,
         createdAt: discountCode.createdAt,
         updatedAt: discountCode.updatedAt,
         isValid: discountCode.isValid()

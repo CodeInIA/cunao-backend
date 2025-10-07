@@ -157,6 +157,7 @@ interface IOrder extends Document {
   trackingNumber?: string;
   trackingUrl?: string;
   region?: string;
+  discountCode?: string;
   reviewToken?: {
     token: string;
     createdAt?: Date;
@@ -193,6 +194,7 @@ const OrderSchema: Schema = new Schema({
   trackingNumber: String,
   trackingUrl: String,
   region: { type: String },
+  discountCode: { type: String },
   reviewToken: {
     token: { type: String },
     createdAt: { type: Date },

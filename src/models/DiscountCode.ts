@@ -6,6 +6,8 @@ export interface IDiscountCode extends Document {
   expiryDate?: Date;
   isActive: boolean;
   appliesTo?: 'subtotal' | 'shipping';
+  maxUses?: number | null;
+  usedCount: number;
   createdAt: Date;
   updatedAt: Date;
   isValid(): boolean;
@@ -62,6 +64,23 @@ const DiscountCodeSchema: Schema = new Schema({
     type: String,
     enum: ['subtotal', 'shipping'],
     default: 'subtotal'
+  },
+  maxUses: {
+    type: Number,
+    default: null,
+    min: 1,
+    validate: {
+      validator: function(uses: number | null) {
+        if (uses === null) return true; // Usos ilimitados
+        return Number.isInteger(uses) && uses > 0;
+      },
+      message: 'El número máximo de usos debe ser un número entero positivo'
+    }
+  },
+  usedCount: {
+    type: Number,
+    default: 0,
+    min: 0
   }
 }, {
   timestamps: true
@@ -72,6 +91,7 @@ const DiscountCodeSchema: Schema = new Schema({
 // Método para verificar si el código está vigente
 DiscountCodeSchema.methods.isValid = function(): boolean {
   if (!this.isActive) return false;
+  if (this.maxUses !== null && this.usedCount >= this.maxUses) return false; // Usos agotados
   if (!this.expiryDate) return true; // Código permanente
   return new Date() < this.expiryDate;
 };
@@ -81,9 +101,19 @@ DiscountCodeSchema.statics.findValidCode = function(code: string) {
   return this.findOne({
     code: code.toUpperCase(),
     isActive: true,
-    $or: [
-      { expiryDate: null },
-      { expiryDate: { $gt: new Date() } }
+    $and: [
+      {
+        $or: [
+          { expiryDate: null },
+          { expiryDate: { $gt: new Date() } }
+        ]
+      },
+      {
+        $or: [
+          { maxUses: null },
+          { $expr: { $lt: ['$usedCount', '$maxUses'] } }
+        ]
+      }
     ]
   });
 };

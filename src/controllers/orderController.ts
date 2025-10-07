@@ -189,7 +189,8 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     },
     totalAmount: secureItemsTemp.reduce((acc: number, item: any) => acc + item.price * item.quantity, 0),
     status: 'pending',
-    region: shippingRegion
+    region: shippingRegion,
+    discountCode: appliedDiscount?.code || undefined
   });
 
   // Preparar los datos para Stripe
