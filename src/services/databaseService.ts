@@ -159,6 +159,9 @@ interface IOrder extends Document {
   trackingUrl?: string;
   region?: string;
   discountCode?: string;
+  discountPercentage?: number;
+  discountAppliesTo?: 'subtotal' | 'shipping';
+  discountAmount?: number;
   reviewToken?: {
     token: string;
     createdAt?: Date;
@@ -197,6 +200,9 @@ const OrderSchema: Schema = new Schema({
   trackingUrl: String,
   region: { type: String },
   discountCode: { type: String },
+  discountPercentage: { type: Number },
+  discountAppliesTo: { type: String, enum: ['subtotal', 'shipping'] },
+  discountAmount: { type: Number },
   reviewToken: {
     token: { type: String },
     createdAt: { type: Date },

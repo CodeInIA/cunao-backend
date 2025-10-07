@@ -119,12 +119,38 @@ async function handleCheckoutCompleted(session: any) {
   // Actualizar la orden existente usando el orderId personalizado
   const shippingCost = (session.amount_total - session.amount_subtotal) / 100;
   
+  // Calcular el descuento aplicado
+  const discountCode = session.metadata?.discount_code || '';
+  const discountPercentage = session.metadata?.discount_percentage ? parseFloat(session.metadata.discount_percentage) : undefined;
+  const discountAppliesTo = session.metadata?.discount_applies_to as 'subtotal' | 'shipping' | undefined;
+  
+  let discountAmount = 0;
+  if (discountCode && discountPercentage && discountAppliesTo) {
+    if (discountAppliesTo === 'subtotal') {
+      // Para descuentos en subtotal, Stripe lo registra en amount_discount
+      const stripeService = stripeServiceModule.getInstance();
+      const detailedSession = await stripeService.getCheckoutSession(session.id);
+      if (detailedSession.total_details?.amount_discount) {
+        discountAmount = detailedSession.total_details.amount_discount / 100;
+      }
+    } else if (discountAppliesTo === 'shipping') {
+      // Para descuentos en envío, calculamos manualmente
+      // El descuento ya está aplicado en el shipping_cost, así que calculamos el monto original
+      const originalShippingCost = shippingCost / (1 - discountPercentage / 100);
+      discountAmount = originalShippingCost - shippingCost;
+    }
+  }
+  
   const updatedOrder = await db.updateOrderByOrderId(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
     customerName: session.customer_details.name,
     totalAmount: session.amount_total / 100,
     shippingCost: shippingCost,
+    discountCode: discountCode || undefined,
+    discountPercentage: discountPercentage,
+    discountAppliesTo: discountAppliesTo,
+    discountAmount: discountAmount > 0 ? discountAmount : undefined,
     shippingDetails: {
       address: session.customer_details.address?.line1 || '',
       city: session.customer_details.address?.city || '',
@@ -138,6 +164,16 @@ async function handleCheckoutCompleted(session: any) {
   if (!updatedOrder) {
     console.error('No se encontró la orden en la base de datos para actualizar por orderId:', orderId);
     return;
+  }
+
+  // Log de información del descuento
+  if (discountCode) {
+    console.log(`💰 Descuento aplicado en orden ${orderId}:`, {
+      code: discountCode,
+      percentage: discountPercentage,
+      appliesTo: discountAppliesTo,
+      amount: discountAmount
+    });
   }
 
   // Incrementar el contador de usos del cupón de descuento si se usó uno
