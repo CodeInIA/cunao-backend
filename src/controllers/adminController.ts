@@ -1343,17 +1343,94 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
       totalSpent: c.totalSpent
     })));
 
+    // Nuevas estadísticas adicionales
+    // 1. Clientes nuevos en el periodo
+    const newClientsInPeriod = await Client.countDocuments({
+      createdAt: { $gte: startDate }
+    });
+
+    // 2. Tasa de conversión (clientes que han comprado vs total)
+    const clientsWithOrders = await Client.countDocuments({
+      orderIds: { $exists: true, $ne: [] }
+    });
+    const conversionRate = totalClients > 0 ? (clientsWithOrders / totalClients) * 100 : 0;
+
+    // 3. Clientes recurrentes (con más de 1 pedido)
+    const recurringClients = await Client.countDocuments({
+      $expr: { $gt: [{ $size: '$orderIds' }, 1] }
+    });
+
+    // 4. Promedio de pedidos por cliente
+    const avgOrdersPerClient = clientsWithOrders > 0 ? (totalOrdersCount[0]?.total || 0) / clientsWithOrders : 0;
+
+    // 5. Cliente con más pedidos
+    const topClientByOrders = await Client.findOne()
+      .sort({ 'orderIds': -1 })
+      .limit(1)
+      .lean();
+    
+    // 6. Distribución por región/país (si existe en address)
+    const clientsByCountry = await Client.aggregate([
+      {
+        $group: {
+          _id: '$address.country',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // 7. Valor de vida del cliente promedio (LTV)
+    const avgCustomerLifetimeValue = clientsWithOrders > 0 ? totalRevenue / clientsWithOrders : 0;
+
+    // 8. Pedidos completados vs pendientes/procesando
+    const ordersByStatus = await OrderModel.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
     return res.json({
       success: true,
       stats: {
+        // Estadísticas básicas
         totalClients,
         totalWithMarketing,
         totalOrders: totalOrdersCount[0]?.total || 0,
         newsletterSubscribers: newsletterCount,
+        
+        // Estadísticas de ingresos
         totalRevenue: parseFloat(totalRevenue.toFixed(2)),
         periodRevenue: parseFloat(periodRevenue.toFixed(2)),
         periodOrders,
         averageOrderValue: periodOrders > 0 ? parseFloat((periodRevenue / periodOrders).toFixed(2)) : 0,
+        
+        // Nuevas estadísticas
+        newClientsInPeriod,
+        conversionRate: parseFloat(conversionRate.toFixed(2)),
+        recurringClients,
+        avgOrdersPerClient: parseFloat(avgOrdersPerClient.toFixed(2)),
+        clientsWithOrders,
+        avgCustomerLifetimeValue: parseFloat(avgCustomerLifetimeValue.toFixed(2)),
+        topClientByOrders: topClientByOrders ? {
+          name: topClientByOrders.name,
+          email: topClientByOrders.email,
+          orderCount: topClientByOrders.orderIds?.length || 0
+        } : null,
+        clientsByCountry: clientsByCountry.map(c => ({
+          country: c._id || 'Desconocido',
+          count: c.count
+        })),
+        ordersByStatus: ordersByStatus.reduce((acc: any, item: any) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        
+        // Gráficos y rankings
         monthlyRevenue,
         topClients: clientsWithSpending.map(c => ({
           id: c._id,
