@@ -355,8 +355,7 @@ const getWeeklyProducts = async (weekYear?: string): Promise<IWeeklyProduct[]> =
     
     const products = await WeeklyProduct.find({ weekYear: targetWeek })
       .sort({ publishedAt: -1 }) // Más recientes primero
-      .limit(10) // Máximo 10 productos por semana
-      .lean();
+      .limit(10); // Máximo 10 productos por semana
     
     console.log(`📦 Encontrados ${products.length} productos para la semana ${targetWeek}`);
     return products;
