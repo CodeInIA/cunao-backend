@@ -20,6 +20,12 @@ router.post('/reviews/publish/:id', adminAuth, csrfProtection, adminCtrl.publish
 router.delete('/reviews/:id', adminAuth, csrfProtection, adminCtrl.deleteReviewAdmin);
 router.post('/reviews/create', adminAuth, csrfProtection, upload.any(), adminCtrl.createReviewAdmin);
 
+// Discount code management
+router.get('/discount-codes', adminAuth, adminCtrl.listDiscountCodesAdmin);
+router.post('/discount-codes', adminAuth, csrfProtection, adminCtrl.createDiscountCodeAdmin);
+router.put('/discount-codes/:id', adminAuth, csrfProtection, adminCtrl.updateDiscountCodeAdmin);
+router.delete('/discount-codes/:id', adminAuth, csrfProtection, adminCtrl.deleteDiscountCodeAdmin);
+
 // Session helpers
 router.post('/logout', adminAuth, adminCtrl.logout);
 router.get('/me', adminAuth, adminCtrl.me);
