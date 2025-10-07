@@ -143,8 +143,22 @@ async function handleCheckoutCompleted(session: any) {
       const discountCode = await DiscountCode.findOne({ code: updatedOrder.discountCode.toUpperCase() });
       if (discountCode) {
         discountCode.usedCount = (discountCode.usedCount || 0) + 1;
+        
+        // Registrar quién usó el cupón
+        const usageRecord = {
+          email: session.customer_details.email || '',
+          name: session.customer_details.name || undefined,
+          usedAt: new Date()
+        };
+        
+        if (!discountCode.usedBy) {
+          discountCode.usedBy = [];
+        }
+        discountCode.usedBy.push(usageRecord);
+        
         await discountCode.save();
         console.log(`✅ Contador de usos actualizado para el cupón: ${discountCode.code} (${discountCode.usedCount}${discountCode.maxUses ? `/${discountCode.maxUses}` : ' usos'})`);
+        console.log(`📝 Uso registrado para: ${usageRecord.email}`);
       } else {
         console.warn(`⚠️ No se encontró el cupón de descuento: ${updatedOrder.discountCode}`);
       }

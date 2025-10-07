@@ -292,10 +292,11 @@ function generateDiscountEmailHTML(
 </html>`;
 }
 
-async function sendDiscountEmails(discountCode: any): Promise<{ sent: number; failed: number; total: number }> {
+async function sendDiscountEmails(discountCode: any): Promise<{ sent: number; failed: number; total: number; successfulEmails: string[] }> {
   let emailsSent = 0;
   let emailsFailed = 0;
   let emailsToSend: string[] = [];
+  let successfulEmails: string[] = [];
 
   try {
     // Determinar lista de emails
@@ -350,6 +351,7 @@ async function sendDiscountEmails(discountCode: any): Promise<{ sent: number; fa
         });
         
         emailsSent++;
+        successfulEmails.push(email);
         console.log(`✅ Email de cupón programado enviado a: ${email}`);
         
       } catch (error) {
@@ -367,7 +369,8 @@ async function sendDiscountEmails(discountCode: any): Promise<{ sent: number; fa
   return {
     sent: emailsSent,
     failed: emailsFailed,
-    total: emailsToSend.length
+    total: emailsToSend.length,
+    successfulEmails: successfulEmails
   };
 }
 
@@ -405,12 +408,13 @@ async function activateScheduledDiscounts() {
         // Si tiene envío de emails programado, enviarlos
         if (code.scheduledEmailSend) {
           console.log(`📧 Iniciando envío de emails para cupón ${code.code}...`);
-          const emailStats = await sendDiscountEmails(code);
-          console.log(`📊 Cupón ${code.code} - Emails: ${emailStats.sent} enviados, ${emailStats.failed} fallidos de ${emailStats.total} totales`);
+          const emailResult: any = await sendDiscountEmails(code);
+          console.log(`📊 Cupón ${code.code} - Emails: ${emailResult.sent} enviados, ${emailResult.failed} fallidos de ${emailResult.total} totales`);
           
-          // Marcar que se enviaron emails si al menos uno fue exitoso
-          if (emailStats.sent > 0) {
+          // Marcar que se enviaron emails si al menos uno fue exitoso y guardar la lista
+          if (emailResult.sent > 0) {
             code.emailsSent = true;
+            code.emailsSentTo = emailResult.successfulEmails || [];
             await code.save({ validateBeforeSave: false });
           }
         }

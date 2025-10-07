@@ -15,7 +15,13 @@ export interface IDiscountCode extends Document {
     sendToSubscribers?: boolean;
   };
   wasScheduled?: boolean;
-  emailsSent?: boolean; // Nuevo campo para rastrear si se enviaron emails
+  emailsSent?: boolean;
+  emailsSentTo?: string[]; // Lista de emails a quienes se envió
+  usedBy?: Array<{ // Lista de clientes que lo usaron
+    email: string;
+    name?: string;
+    usedAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
   isValid(): boolean;
@@ -116,7 +122,16 @@ const DiscountCodeSchema: Schema = new Schema({
   emailsSent: {
     type: Boolean,
     default: false
-  }
+  },
+  emailsSentTo: {
+    type: [String],
+    default: []
+  },
+  usedBy: [{
+    email: { type: String, required: true },
+    name: { type: String },
+    usedAt: { type: Date, default: Date.now }
+  }]
 }, {
   timestamps: true
 });

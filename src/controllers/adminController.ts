@@ -612,6 +612,8 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
       scheduledEmailSend: code.scheduledEmailSend,
       wasScheduled: code.wasScheduled,
       emailsSent: code.emailsSent,
+      emailsSentTo: code.emailsSentTo || [],
+      usedBy: code.usedBy || [],
       createdAt: code.createdAt,
       updatedAt: code.updatedAt,
       isValid: code.isValid()
@@ -748,6 +750,7 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
         const frontendUrl = process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
 
         // Enviar emails
+        const successfulEmails: string[] = [];
         for (const email of emailsToSend) {
           try {
             let preferencesUrl = '';
@@ -778,6 +781,7 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
             });
             
             emailsSent++;
+            successfulEmails.push(email);
             console.log(`✅ Email enviado a: ${email}`);
             
           } catch (error) {
@@ -793,11 +797,13 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
           total: emailsToSend.length
         };
 
-        // Marcar que se enviaron emails si al menos uno fue exitoso
+        // Marcar que se enviaron emails si al menos uno fue exitoso y guardar la lista
         if (emailsSent > 0) {
           discountCode.emailsSent = true;
+          discountCode.emailsSentTo = successfulEmails;
           await discountCode.save();
           responseData.emailsSent = true;
+          responseData.emailsSentTo = successfulEmails;
         }
 
         console.log(`📊 Emails enviados: ${emailsSent}, fallidos: ${emailsFailed}`);
