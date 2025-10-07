@@ -611,7 +611,7 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
 
 export async function createDiscountCodeAdmin(req: Request, res: Response) {
   try {
-    const { code, discountPercentage, expiryDate, isActive, appliesTo, sendEmail: sendEmailToSubscribers } = req.body;
+    const { code, discountPercentage, expiryDate, isActive, appliesTo, sendEmail: sendEmailToSubscribers, customEmails } = req.body;
     
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'El código es requerido' });
@@ -652,37 +652,47 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       isValid: discountCode.isValid()
     };
 
-    // Si se solicitó enviar emails a suscriptores
+    // Si se solicitó enviar emails
     if (sendEmailToSubscribers) {
       let emailsSent = 0;
       let emailsFailed = 0;
+      let emailsToSend: string[] = [];
 
       try {
-        // Obtener suscriptores con promociones activadas
-        const subscribers = await Newsletter.find({
-          'preferences.promotions': true
-        });
-
-        console.log(`📧 Enviando cupón a ${subscribers.length} suscriptores...`);
+        // Determinar lista de emails
+        if (customEmails && Array.isArray(customEmails) && customEmails.length > 0) {
+          // Usar lista personalizada
+          emailsToSend = customEmails.map((email: string) => email.trim()).filter((email: string) => email);
+          console.log(`📧 Enviando cupón a lista personalizada de ${emailsToSend.length} emails...`);
+        } else {
+          // Obtener suscriptores con promociones activadas
+          const subscribers = await Newsletter.find({
+            'preferences.promotions': true
+          });
+          emailsToSend = subscribers.map(s => s.email);
+          console.log(`📧 Enviando cupón a ${emailsToSend.length} suscriptores...`);
+        }
 
         // Preparar texto de expiración
         const expiryText = discountCode.expiryDate 
           ? `expira el ${new Date(discountCode.expiryDate).toLocaleDateString('es-ES')}`
           : 'Permanente';
 
+        const frontendUrl = process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
+
         // Enviar emails
-        for (const subscriber of subscribers) {
+        for (const email of emailsToSend) {
           try {
-            // Generar token para preferencias
-            const token = generateNewsletterToken(subscriber.email);
+            let preferencesUrl = '';
             
-            // Actualizar token en la base de datos
-            subscriber.lastToken = token;
-            await subscriber.save();
-            
-            // URL de preferencias
-            const frontendUrl = process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_URL || 'https://www.cunadismoilustrado.me';
-            const preferencesUrl = `${frontendUrl}/newsletter/preferences?token=${token}`;
+            // Si es un suscriptor en la BD, generar URL de preferencias
+            const subscriber = await Newsletter.findOne({ email });
+            if (subscriber) {
+              const token = generateNewsletterToken(email);
+              subscriber.lastToken = token;
+              await subscriber.save();
+              preferencesUrl = `${frontendUrl}/newsletter/preferences?token=${token}`;
+            }
 
             const emailHTML = generateDiscountEmailHTML(
               discountCode.discountPercentage,
@@ -693,17 +703,17 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
             );
             
             await sendEmail({
-              to: subscriber.email,
+              to: email,
               subject: `🎉 ¡${discountCode.discountPercentage}% de descuento exclusivo para ti!`,
               html: emailHTML
             });
             
             emailsSent++;
-            console.log(`✅ Email enviado a: ${subscriber.email}`);
+            console.log(`✅ Email enviado a: ${email}`);
             
           } catch (error) {
             emailsFailed++;
-            console.error(`❌ Error enviando email a ${subscriber.email}:`, error);
+            console.error(`❌ Error enviando email a ${email}:`, error);
           }
         }
 
@@ -711,7 +721,7 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
         responseData.emailStats = {
           sent: emailsSent,
           failed: emailsFailed,
-          total: subscribers.length
+          total: emailsToSend.length
         };
 
         console.log(`📊 Emails enviados: ${emailsSent}, fallidos: ${emailsFailed}`);
@@ -828,6 +838,30 @@ export async function deleteDiscountCodeAdmin(req: Request, res: Response) {
     return res.json({ success: true });
   } catch (e) {
     console.error('Error deleting discount code:', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function listNewsletterSubscribers(req: Request, res: Response) {
+  try {
+    const subscribers = await Newsletter.find({})
+      .select('email preferences createdAt')
+      .sort({ createdAt: -1 });
+
+    const subscribersData = subscribers.map(sub => ({
+      email: sub.email,
+      preferences: sub.preferences,
+      createdAt: sub.createdAt,
+      hasPromotions: sub.preferences?.promotions || false
+    }));
+
+    return res.json({ 
+      success: true, 
+      subscribers: subscribersData,
+      total: subscribersData.length
+    });
+  } catch (e) {
+    console.error('Error fetching newsletter subscribers:', e);
     return res.status(500).json({ error: 'Error interno' });
   }
 }

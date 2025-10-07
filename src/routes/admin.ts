@@ -26,6 +26,9 @@ router.post('/discount-codes', adminAuth, csrfProtection, adminCtrl.createDiscou
 router.put('/discount-codes/:id', adminAuth, csrfProtection, adminCtrl.updateDiscountCodeAdmin);
 router.delete('/discount-codes/:id', adminAuth, csrfProtection, adminCtrl.deleteDiscountCodeAdmin);
 
+// Newsletter subscribers
+router.get('/newsletter-subscribers', adminAuth, adminCtrl.listNewsletterSubscribers);
+
 // Session helpers
 router.post('/logout', adminAuth, adminCtrl.logout);
 router.get('/me', adminAuth, adminCtrl.me);
