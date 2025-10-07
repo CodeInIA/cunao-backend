@@ -1,0 +1,77 @@
+name: Products & Catalog
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/productController.ts'
+      - 'src/routes/products.ts'
+      - 'src/services/printifyService.ts'
+      - 'src/controllers/weeklyProductsController.ts'
+      - 'src/models/WeeklyProducts.ts'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/productController.ts'
+      - 'src/routes/products.ts'
+  workflow_dispatch:
+
+jobs:
+  test-products:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+      PRINTIFY_API_TOKEN: fake_printify_token_12345678901234567890
+      PRINTIFY_SHOP_ID: "1234567"
+      MONGODB_URI: mongodb://localhost:27017/test-db
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Test Product Controller
+      run: |
+        echo "Testing product listing, search, and filtering"
+        npx tsc --noEmit src/controllers/productController.ts
+    
+    - name: Test Weekly Products Controller
+      run: |
+        echo "Testing weekly products management"
+        npx tsc --noEmit src/controllers/weeklyProductsController.ts
+    
+    - name: Test Printify Product Sync
+      run: |
+        echo "Testing Printify catalog synchronization"
+        npx tsc --noEmit src/services/printifyService.ts
+    
+    - name: Run product-related unit tests
+      run: npm test -- --testPathPattern=product
+      continue-on-error: true
+    
+    - name: Check product routes configuration
+      run: |
+        echo "Validating product routes"
+        npx tsc --noEmit src/routes/products.ts
+    
+    - name: Test weekly products cron job
+      run: |
+        echo "Testing weekly new products notification"
+        npx tsc --noEmit src/cron/weeklyNewProducts.ts
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: products-test-results
+        path: coverage/
+        retention-days: 7

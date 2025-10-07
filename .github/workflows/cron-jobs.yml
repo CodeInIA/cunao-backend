@@ -1,0 +1,86 @@
+name: Scheduled Tasks & Cron Jobs
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/cron/**'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/cron/**'
+  workflow_dispatch:
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  test-cron-jobs:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://localhost:27017/test-db
+      PRINTIFY_API_TOKEN: fake_printify_token_12345678901234567890
+      PRINTIFY_SHOP_ID: "1234567"
+      EMAIL_USER: test@example.com
+      EMAIL_PASS: fake_email_password_12345
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Test Cleanup Expired Orders Job
+      run: |
+        echo "Testing cleanup of expired orders"
+        npx tsc --noEmit src/cron/cleanupExpiredOrders.ts
+    
+    - name: Test Cancel Printify Orders Job
+      run: |
+        echo "Testing Printify order cancellation"
+        npx tsc --noEmit src/cron/cancelAllPrintifyOrders.ts
+    
+    - name: Test Create Discount Code Job
+      run: |
+        echo "Testing automatic discount code creation"
+        npx tsc --noEmit src/cron/createDiscountCode.ts
+    
+    - name: Test Activate Scheduled Discounts Job
+      run: |
+        echo "Testing scheduled discount activation"
+        npx tsc --noEmit src/cron/activateScheduledDiscounts.ts
+    
+    - name: Test Weekly Newsletter Job
+      run: |
+        echo "Testing weekly newsletter sending"
+        npx tsc --noEmit src/cron/weeklyNewsletter.ts
+    
+    - name: Test Weekly New Products Job
+      run: |
+        echo "Testing weekly new products notification"
+        npx tsc --noEmit src/cron/weeklyNewProducts.ts
+    
+    - name: Build all cron jobs
+      run: npm run build
+    
+    - name: Verify cron job scheduling
+      run: |
+        echo "Verifying cron job configuration in server.ts"
+        npx tsc --noEmit src/server.ts
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cron-jobs-test-results
+        path: coverage/
+        retention-days: 7

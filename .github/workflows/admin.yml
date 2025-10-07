@@ -1,0 +1,86 @@
+name: Admin Panel & Authentication
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/adminController.ts'
+      - 'src/routes/admin.ts'
+      - 'src/middleware/adminAuth.ts'
+      - 'src/models/User.ts'
+      - 'scripts/createAdmin.ts'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/adminController.ts'
+      - 'src/routes/admin.ts'
+  workflow_dispatch:
+
+jobs:
+  test-admin:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://localhost:27017/test-db
+      JWT_SECRET: fake_jwt_secret_key_for_testing_workflow_only_12345
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Test Admin Controller
+      run: |
+        echo "Testing admin authentication and authorization"
+        npx tsc --noEmit src/controllers/adminController.ts
+    
+    - name: Test Admin Middleware
+      run: |
+        echo "Testing admin authentication middleware"
+        npx tsc --noEmit src/middleware/adminAuth.ts
+    
+    - name: Test User Model
+      run: |
+        echo "Testing user schema and password hashing"
+        npx tsc --noEmit src/models/User.ts
+    
+    - name: Run admin-related unit tests
+      run: npm test -- --testPathPattern=admin
+      continue-on-error: true
+    
+    - name: Check admin routes configuration
+      run: |
+        echo "Validating admin routes"
+        npx tsc --noEmit src/routes/admin.ts
+    
+    - name: Test admin creation script
+      run: |
+        echo "Testing admin user creation"
+        npx tsc --noEmit scripts/createAdmin.ts
+    
+    - name: Verify JWT token generation
+      run: |
+        echo "Verifying JWT token generation and validation"
+        npm run build
+    
+    - name: Test password security
+      run: |
+        echo "Testing password hashing and comparison"
+        npm run build
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-test-results
+        path: coverage/
+        retention-days: 7

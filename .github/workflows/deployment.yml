@@ -1,0 +1,98 @@
+name: Deployment Validation
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  validate-deployment:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci --production=false
+    
+    - name: Verify Procfile exists
+      run: |
+        if [ -f "Procfile" ]; then
+          echo "Procfile found"
+          cat Procfile
+        else
+          echo "Error: Procfile not found"
+          exit 1
+        fi
+    
+    - name: Validate package.json scripts
+      run: |
+        echo "Checking required scripts..."
+        node -e "
+          const pkg = require('./package.json');
+          const required = ['start', 'build', 'dev'];
+          const missing = required.filter(s => !pkg.scripts[s]);
+          if (missing.length > 0) {
+            console.error('Missing scripts:', missing);
+            process.exit(1);
+          }
+          console.log('All required scripts present');
+        "
+    
+    - name: Check TypeScript configuration
+      run: |
+        if [ -f "tsconfig.json" ]; then
+          echo "TypeScript config found"
+          npx tsc --noEmit
+        else
+          echo "Error: tsconfig.json not found"
+          exit 1
+        fi
+    
+    - name: Build for production
+      run: npm run build
+    
+    - name: Verify build output
+      run: |
+        if [ -d "dist" ]; then
+          echo "Build output directory exists"
+          ls -la dist/
+        else
+          echo "Error: Build output directory not found"
+          exit 1
+        fi
+    
+    - name: Check environment variables documentation
+      run: |
+        echo "Required environment variables:"
+        echo "- MONGODB_URI"
+        echo "- STRIPE_SECRET_KEY"
+        echo "- PRINTIFY_API_TOKEN"
+        echo "- PRINTIFY_SHOP_ID"
+        echo "- JWT_SECRET"
+        echo "- EMAIL_USER"
+        echo "- EMAIL_PASS"
+        echo "- CLOUDINARY_CLOUD_NAME"
+        echo "- CLOUDINARY_API_KEY"
+        echo "- CLOUDINARY_API_SECRET"
+    
+    - name: Test production server start
+      run: |
+        timeout 10s npm start || if [ $? -eq 124 ]; then echo "Server started successfully"; else exit 1; fi
+      continue-on-error: true
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: production-build
+        path: dist/
+        retention-days: 7

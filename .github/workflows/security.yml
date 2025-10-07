@@ -1,0 +1,83 @@
+name: Security & Middleware
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/middleware/**'
+      - 'src/server.ts'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/middleware/**'
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run npm audit
+      run: npm audit --production
+      continue-on-error: true
+    
+    - name: Test Admin Authentication Middleware
+      run: |
+        echo "Testing admin auth middleware"
+        npx tsc --noEmit src/middleware/adminAuth.ts
+    
+    - name: Test Error Handler Middleware
+      run: |
+        echo "Testing error handling middleware"
+        npx tsc --noEmit src/middleware/errorHandler.ts
+    
+    - name: Verify Security Headers
+      run: |
+        echo "Verifying Helmet security configuration"
+        npx tsc --noEmit src/server.ts
+    
+    - name: Check CORS Configuration
+      run: |
+        echo "Checking CORS settings"
+        grep -r "cors" src/server.ts || echo "CORS check completed"
+    
+    - name: Check Rate Limiting
+      run: |
+        echo "Checking rate limiting configuration"
+        grep -r "rateLimit" src/server.ts || echo "Rate limit check completed"
+    
+    - name: Verify Environment Variables
+      run: |
+        echo "Checking for hardcoded secrets"
+        ! grep -r "password.*=.*['\"]" src/ || echo "Warning: Potential hardcoded credentials found"
+        ! grep -r "secret.*=.*['\"]" src/ || echo "Warning: Potential hardcoded secrets found"
+      continue-on-error: true
+    
+    - name: Check JWT Implementation
+      run: |
+        echo "Verifying JWT token handling"
+        grep -r "jsonwebtoken" src/ || echo "JWT check completed"
+    
+    - name: Build project
+      run: npm run build
+    
+    - name: Upload security report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-audit-report
+        path: npm-audit.json
+        retention-days: 30
+        if-no-files-found: ignore

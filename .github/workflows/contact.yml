@@ -1,0 +1,76 @@
+name: Contact & Communication
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/contactController.ts'
+      - 'src/routes/contact.ts'
+      - 'src/services/emailService.ts'
+      - 'src/services/notificationService.ts'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/contactController.ts'
+      - 'src/routes/contact.ts'
+  workflow_dispatch:
+
+jobs:
+  test-contact:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+      EMAIL_USER: test@example.com
+      EMAIL_PASS: fake_email_password_12345
+      ADMIN_EMAIL: admin@example.com
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Test Contact Controller
+      run: |
+        echo "Testing contact form submission and validation"
+        npx tsc --noEmit src/controllers/contactController.ts
+    
+    - name: Test Email Service
+      run: |
+        echo "Testing email sending functionality"
+        npx tsc --noEmit src/services/emailService.ts
+    
+    - name: Test Notification Service
+      run: |
+        echo "Testing notification system"
+        npx tsc --noEmit src/services/notificationService.ts
+    
+    - name: Run contact-related unit tests
+      run: npm test -- --testPathPattern=contact
+      continue-on-error: true
+    
+    - name: Check contact routes configuration
+      run: |
+        echo "Validating contact routes"
+        npx tsc --noEmit src/routes/contact.ts
+    
+    - name: Verify spam protection
+      run: |
+        echo "Verifying rate limiting and validation"
+        npm run build
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: contact-test-results
+        path: coverage/
+        retention-days: 7

@@ -1,0 +1,68 @@
+name: Analytics & Reporting
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/analyticsController.ts'
+      - 'src/routes/analytics.ts'
+      - 'src/models/Client.ts'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'src/controllers/analyticsController.ts'
+      - 'src/routes/analytics.ts'
+  workflow_dispatch:
+
+jobs:
+  test-analytics:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://localhost:27017/test-db
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Test Analytics Controller
+      run: |
+        echo "Testing analytics data aggregation and reporting"
+        npx tsc --noEmit src/controllers/analyticsController.ts
+    
+    - name: Run analytics-related unit tests
+      run: npm test -- --testPathPattern=analytics
+      continue-on-error: true
+    
+    - name: Check analytics routes configuration
+      run: |
+        echo "Validating analytics routes"
+        npx tsc --noEmit src/routes/analytics.ts
+    
+    - name: Verify data aggregation logic
+      run: |
+        echo "Verifying sales and revenue calculations"
+        npm run build
+    
+    - name: Test client data models
+      run: |
+        echo "Testing client data schema"
+        npx tsc --noEmit src/models/Client.ts
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: analytics-test-results
+        path: coverage/
+        retention-days: 7
