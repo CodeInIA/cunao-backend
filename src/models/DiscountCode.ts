@@ -8,6 +8,14 @@ export interface IDiscountCode extends Document {
   appliesTo?: 'subtotal' | 'shipping';
   maxUses?: number | null;
   usedCount: number;
+  scheduledActivation?: Date;
+  scheduledEmailSend?: boolean;
+  scheduledEmailData?: {
+    customEmails?: string[];
+    sendToSubscribers?: boolean;
+  };
+  wasScheduled?: boolean;
+  emailsSent?: boolean; // Nuevo campo para rastrear si se enviaron emails
   createdAt: Date;
   updatedAt: Date;
   isValid(): boolean;
@@ -81,6 +89,33 @@ const DiscountCodeSchema: Schema = new Schema({
     type: Number,
     default: 0,
     min: 0
+  },
+  scheduledActivation: {
+    type: Date,
+    default: null,
+    validate: {
+      validator: function(date: Date | null) {
+        if (date === null) return true; // No programado
+        return date > new Date(); // La fecha debe ser futura
+      },
+      message: 'La fecha de activación programada debe ser futura'
+    }
+  },
+  scheduledEmailSend: {
+    type: Boolean,
+    default: false
+  },
+  scheduledEmailData: {
+    customEmails: [String],
+    sendToSubscribers: Boolean
+  },
+  wasScheduled: {
+    type: Boolean,
+    default: false
+  },
+  emailsSent: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

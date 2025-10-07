@@ -608,6 +608,10 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
       appliesTo: code.appliesTo,
       maxUses: code.maxUses,
       usedCount: code.usedCount,
+      scheduledActivation: code.scheduledActivation,
+      scheduledEmailSend: code.scheduledEmailSend,
+      wasScheduled: code.wasScheduled,
+      emailsSent: code.emailsSent,
       createdAt: code.createdAt,
       updatedAt: code.updatedAt,
       isValid: code.isValid()
@@ -622,7 +626,18 @@ export async function listDiscountCodesAdmin(req: Request, res: Response) {
 
 export async function createDiscountCodeAdmin(req: Request, res: Response) {
   try {
-    const { code, discountPercentage, expiryDate, isActive, appliesTo, maxUses, sendEmail: sendEmailToSubscribers, customEmails } = req.body;
+    const { 
+      code, 
+      discountPercentage, 
+      expiryDate, 
+      isActive, 
+      appliesTo, 
+      maxUses, 
+      sendEmail: sendEmailToSubscribers, 
+      customEmails,
+      scheduledActivation,
+      scheduledEmailSend
+    } = req.body;
     
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'El código es requerido' });
@@ -632,10 +647,23 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       return res.status(400).json({ error: 'El porcentaje debe estar entre 1 y 100' });
     }
 
+    // Validar lógica de programación
+    if (scheduledActivation) {
+      const schedDate = new Date(scheduledActivation);
+      if (schedDate <= new Date()) {
+        return res.status(400).json({ error: 'La fecha de activación programada debe ser futura' });
+      }
+      
+      // Si está programado, debe estar inactivo inicialmente
+      if (isActive === true) {
+        return res.status(400).json({ error: 'Un cupón programado no puede estar activo desde el inicio' });
+      }
+    }
+
     const discountData: any = {
       code: code.trim().toUpperCase(),
       discountPercentage: Number(discountPercentage),
-      isActive: isActive !== undefined ? Boolean(isActive) : true,
+      isActive: scheduledActivation ? false : (isActive !== undefined ? Boolean(isActive) : true),
       appliesTo: appliesTo || 'subtotal',
       usedCount: 0
     };
@@ -656,6 +684,20 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       discountData.maxUses = uses;
     }
 
+    // Configurar programación si está presente
+    if (scheduledActivation) {
+      discountData.scheduledActivation = new Date(scheduledActivation);
+      discountData.scheduledEmailSend = Boolean(scheduledEmailSend);
+      
+      // Guardar datos de email si el envío está programado
+      if (scheduledEmailSend) {
+        discountData.scheduledEmailData = {
+          sendToSubscribers: !customEmails || customEmails.length === 0,
+          customEmails: customEmails && Array.isArray(customEmails) ? customEmails : []
+        };
+      }
+    }
+
     const discountCode = new DiscountCode(discountData);
     await discountCode.save();
 
@@ -669,13 +711,16 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
       appliesTo: discountCode.appliesTo,
       maxUses: discountCode.maxUses,
       usedCount: discountCode.usedCount,
+      scheduledActivation: discountCode.scheduledActivation,
+      scheduledEmailSend: discountCode.scheduledEmailSend,
+      wasScheduled: discountCode.wasScheduled,
       createdAt: discountCode.createdAt,
       updatedAt: discountCode.updatedAt,
       isValid: discountCode.isValid()
     };
 
-    // Si se solicitó enviar emails
-    if (sendEmailToSubscribers) {
+    // Si NO está programado y se solicitó enviar emails inmediatamente
+    if (!scheduledActivation && sendEmailToSubscribers) {
       let emailsSent = 0;
       let emailsFailed = 0;
       let emailsToSend: string[] = [];
@@ -748,6 +793,13 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
           total: emailsToSend.length
         };
 
+        // Marcar que se enviaron emails si al menos uno fue exitoso
+        if (emailsSent > 0) {
+          discountCode.emailsSent = true;
+          await discountCode.save();
+          responseData.emailsSent = true;
+        }
+
         console.log(`📊 Emails enviados: ${emailsSent}, fallidos: ${emailsFailed}`);
 
       } catch (emailError) {
@@ -760,6 +812,9 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
           error: 'Error al enviar emails'
         };
       }
+    } else if (scheduledActivation) {
+      // Cupón programado
+      responseData.message = `Cupón programado para activarse el ${new Date(scheduledActivation).toLocaleString('es-ES')}${scheduledEmailSend ? ' y enviar emails automáticamente' : ''}`;
     }
 
     return res.json({ 
@@ -782,11 +837,31 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
 export async function updateDiscountCodeAdmin(req: Request, res: Response) {
   try {
     const id = req.params.id;
-    const { code, discountPercentage, expiryDate, isActive, appliesTo, maxUses } = req.body;
+    const { 
+      code, 
+      discountPercentage, 
+      expiryDate, 
+      isActive, 
+      appliesTo, 
+      maxUses,
+      scheduledActivation,
+      scheduledEmailSend,
+      customEmails
+    } = req.body;
 
     const discountCode = await DiscountCode.findById(id);
     if (!discountCode) {
       return res.status(404).json({ error: 'Código no encontrado' });
+    }
+
+    // No permitir editar cupones que ya enviaron emails
+    if (discountCode.emailsSent) {
+      return res.status(400).json({ error: 'No se puede editar un cupón que ya fue enviado por email a los suscriptores' });
+    }
+
+    // No permitir modificar cupones que ya fueron programados y activados
+    if (discountCode.wasScheduled && scheduledActivation) {
+      return res.status(400).json({ error: 'No se puede reprogramar un cupón que ya fue activado automáticamente' });
     }
 
     if (code && code.trim()) {
@@ -812,7 +887,41 @@ export async function updateDiscountCodeAdmin(req: Request, res: Response) {
       }
     }
 
-    if (isActive !== undefined) {
+    // Manejar programación
+    if (scheduledActivation !== undefined) {
+      if (scheduledActivation === null || scheduledActivation === '') {
+        // Cancelar programación
+        discountCode.scheduledActivation = undefined;
+        discountCode.scheduledEmailSend = false;
+        discountCode.scheduledEmailData = undefined;
+      } else {
+        const schedDate = new Date(scheduledActivation);
+        if (schedDate <= new Date()) {
+          return res.status(400).json({ error: 'La fecha de activación programada debe ser futura' });
+        }
+        discountCode.scheduledActivation = schedDate;
+        
+        // Si se programa, debe estar inactivo
+        if (isActive === true) {
+          return res.status(400).json({ error: 'Un cupón programado no puede estar activo' });
+        }
+        discountCode.isActive = false;
+      }
+    }
+
+    if (scheduledEmailSend !== undefined && discountCode.scheduledActivation) {
+      discountCode.scheduledEmailSend = Boolean(scheduledEmailSend);
+      
+      if (scheduledEmailSend) {
+        discountCode.scheduledEmailData = {
+          sendToSubscribers: !customEmails || customEmails.length === 0,
+          customEmails: customEmails && Array.isArray(customEmails) ? customEmails : []
+        };
+      }
+    }
+
+    // Solo permitir cambiar isActive si no está programado
+    if (isActive !== undefined && !discountCode.scheduledActivation) {
       discountCode.isActive = Boolean(isActive);
     }
 
@@ -853,6 +962,9 @@ export async function updateDiscountCodeAdmin(req: Request, res: Response) {
         appliesTo: discountCode.appliesTo,
         maxUses: discountCode.maxUses,
         usedCount: discountCode.usedCount,
+        scheduledActivation: discountCode.scheduledActivation,
+        scheduledEmailSend: discountCode.scheduledEmailSend,
+        wasScheduled: discountCode.wasScheduled,
         createdAt: discountCode.createdAt,
         updatedAt: discountCode.updatedAt,
         isValid: discountCode.isValid()

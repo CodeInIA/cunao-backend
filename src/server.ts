@@ -24,6 +24,7 @@ import { db } from './services/databaseService.js';
 import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
 import { startCleanupScheduler } from './cron/cleanupExpiredOrders.js';
+import { startScheduledDiscountActivator } from './cron/activateScheduledDiscounts.js';
 
 db.connect();
 
@@ -133,4 +134,7 @@ app.listen(PORT, () => {
   
   // Inicializar scheduler de limpieza de órdenes expiradas
   startCleanupScheduler();
+  
+  // Inicializar scheduler de activación de cupones programados
+  startScheduledDiscountActivator();
 });
