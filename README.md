@@ -636,8 +636,8 @@ El sistema cuenta con **6 tareas programadas** para automatización:
 | **Weekly Newsletter** | Domingos | 10:00 AM | Envía newsletter semanal a suscriptores activos |
 | **Weekly Products** | Domingos | 09:00 AM | Selecciona productos destacados de la semana |
 | **Activate Discounts** | Cada hora | XX:00 | Activa descuentos programados |
-| **Cleanup Orders** | Diario | 02:00 AM | Limpia órdenes expiradas (>30 días) |
-| **Create Discount** | Lunes | 00:01 AM | Genera código de descuento semanal |
+| **Cleanup Orders** | Diario | 02:00 AM | Limpia órdenes incompletas/pendientes (>24 horas) |
+| **Create Discount** | Manual | - | Genera códigos de descuento interactivamente |
 | **Cancel Orders** | Manual | - | Cancela pedidos pendientes en Printify |
 
 ### Ejecución Manual
