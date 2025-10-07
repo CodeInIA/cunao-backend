@@ -22,10 +22,13 @@ function generateDiscountEmailHTML(
   code: string,
   expiryText: string,
   customerName: string = '',
-  preferencesUrl: string = ''
+  preferencesUrl: string = '',
+  maxUses?: number | null,
+  appliesTo: 'subtotal' | 'shipping' = 'subtotal'
 ) {
   const greeting = customerName ? `¡Hola ${customerName}!` : '¡Hola cuñao!';
   const frontendUrl = process.env.FRONTEND_PRODUCTION_URL || 'https://www.cunadismoilustrado.me';
+  const appliesToText = appliesTo === 'subtotal' ? 'el subtotal de tu compra' : 'los gastos de envío';
 
   return `
 <!DOCTYPE html>
@@ -252,9 +255,9 @@ function generateDiscountEmailHTML(
             <div class="greeting">${greeting}</div>
             
             <div class="discount-announcement">
-                ¡Tenemos algo especial para ti! Disfruta de un 
+                ¡Tenemos algo especial para ti!<br><br>Disfruta de un 
                 <span class="discount-highlight">${discountPercentage}% de descuento</span>
-                en toda nuestra colección de camisetas cuñao.
+                en ${appliesToText} de toda nuestra colección de camisetas cuñao.
             </div>
             
             <div class="discount-code-container">
@@ -265,6 +268,12 @@ function generateDiscountEmailHTML(
             ${expiryText !== 'Permanente' ? `
             <div class="expiry-info">
                 ⏰ <strong>¡Atención!</strong> Este descuento ${expiryText}
+            </div>
+            ` : ''}
+            
+            ${maxUses !== null && maxUses !== undefined ? `
+            <div class="expiry-info" style="background: rgba(251, 191, 36, 0.1); border-color: #fbbf24; color: #fbbf24;">
+                🏃‍♂️ <strong>¡Date prisa!</strong> Solo las primeras <strong>${maxUses} personas</strong> que hagan una compra podrán usar este descuento exclusivo.
             </div>
             ` : ''}
             
@@ -712,7 +721,9 @@ export async function createDiscountCodeAdmin(req: Request, res: Response) {
               discountCode.code,
               expiryText,
               '',
-              preferencesUrl
+              preferencesUrl,
+              discountCode.maxUses,
+              discountCode.appliesTo
             );
             
             await sendEmail({
