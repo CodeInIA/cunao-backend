@@ -11,6 +11,7 @@ import sharp from 'sharp';
 import printifyService from '../services/printifyService.js';
 import DiscountCode from '../models/DiscountCode.js';
 import Newsletter from '../models/Newsletter.js';
+import Client from '../models/Client.js';
 import { sendEmail } from '../services/emailService.js';
 import { generateNewsletterToken } from '../routes/newsletter.js';
 
@@ -1026,6 +1027,345 @@ export async function listNewsletterSubscribers(req: Request, res: Response) {
     });
   } catch (e) {
     console.error('Error fetching newsletter subscribers:', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+// Client Management Endpoints
+export async function listClientsAdmin(req: Request, res: Response) {
+  try {
+    const { page = 1, limit = 20, search = '', emailMarketing } = req.query;
+    const pageNum = Math.max(1, Number(page));
+    const limitNum = Math.min(100, Math.max(1, Number(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query: any = {};
+    
+    if (search && typeof search === 'string' && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { email: searchRegex },
+        { name: searchRegex }
+      ];
+    }
+
+    if (emailMarketing !== undefined) {
+      query.emailMarketing = emailMarketing === 'true';
+    }
+
+    const [clients, total] = await Promise.all([
+      Client.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .populate('newsletterId')
+        .exec(),
+      Client.countDocuments(query)
+    ]);
+
+    return res.json({
+      success: true,
+      clients,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (e) {
+    console.error('listClientsAdmin error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function getClientDetailsAdmin(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    
+    const client = await Client.findById(id).populate('newsletterId').exec();
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    // Obtener las órdenes del cliente desde MongoDB
+    const orders = await db.getOrdersByIds(client.orderIds);
+
+    // Enriquecer órdenes con información de productos
+    const enrichedOrders = await Promise.all(
+      orders.map(async (order: any) => {
+        // Usar lineItems o items según lo que tenga el pedido
+        const orderItems = order.lineItems || order.items || [];
+        
+        const enrichedItems = await Promise.all(
+          orderItems.map(async (item: any) => {
+            try {
+              const product = await printifyService.getInstance().getProduct(item.productId);
+              
+              // Buscar la imagen específica de la variante
+              let productImage = null;
+              if (product && product.images && product.images.length > 0) {
+                // Buscar imagen que corresponda a esta variante específica
+                const variantImage = product.images.find((img: any) => 
+                  img.variant_ids && img.variant_ids.includes(item.variantId)
+                );
+                // Si no hay imagen específica de variante, usar la primera o la default
+                productImage = variantImage?.src || 
+                              product.images.find((img: any) => img.is_default)?.src || 
+                              product.images[0]?.src || 
+                              null;
+              }
+              
+              return {
+                ...item,
+                productTitle: item.title || product?.title || 'Producto desconocido',
+                productImage: productImage,
+                price: item.price || 0,
+                quantity: item.quantity || 1,
+                size: item.size || 'N/A',
+                color: item.color || 'N/A'
+              };
+            } catch (e) {
+              console.warn(`Could not fetch product ${item.productId}`, e);
+              return {
+                ...item,
+                productTitle: item.title || 'Producto desconocido',
+                productImage: null,
+                price: item.price || 0,
+                quantity: item.quantity || 1,
+                size: item.size || 'N/A',
+                color: item.color || 'N/A'
+              };
+            }
+          })
+        );
+
+        return {
+          ...order,
+          items: enrichedItems,
+          // Asegurar que siempre haya un total
+          total: order.total || order.totalAmount || 0,
+          shippingCost: order.shippingCost || 0
+        };
+      })
+    );
+
+    return res.json({
+      success: true,
+      client,
+      orders: enrichedOrders
+    });
+  } catch (e) {
+    console.error('getClientDetailsAdmin error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function updateClientAdmin(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { emailMarketing, name, phone } = req.body;
+
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    // Actualizar campos permitidos
+    if (name !== undefined) client.name = name;
+    if (phone !== undefined) client.phone = phone;
+    if (emailMarketing !== undefined) {
+      client.emailMarketing = Boolean(emailMarketing);
+      
+      // Si se activa emailMarketing, asegurar suscripción a newsletter
+      if (emailMarketing && !client.newsletterId) {
+        try {
+          let newsletter = await Newsletter.findOne({ email: client.email });
+          if (!newsletter) {
+            newsletter = new Newsletter({
+              email: client.email,
+              preferences: {
+                newsletter: true,
+                promotions: true,
+                newProducts: true
+              }
+            });
+            await newsletter.save();
+          }
+          client.newsletterId = newsletter._id as any;
+        } catch (e) {
+          console.warn('Could not sync newsletter for client', e);
+        }
+      }
+    }
+
+    await client.save();
+
+    return res.json({ success: true, client });
+  } catch (e) {
+    console.error('updateClientAdmin error', e);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+}
+
+export async function getClientStatsAdmin(req: Request, res: Response) {
+  try {
+    const { period = 'month' } = req.query; // month, week, year, all
+    
+    // Calcular fecha de inicio según el periodo
+    const now = new Date();
+    let startDate = new Date(0); // Epoch para "all"
+    
+    switch (period) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+    }
+
+    const [totalClients, totalWithMarketing, totalOrdersCount, newsletterCount] = await Promise.all([
+      Client.countDocuments(),
+      Client.countDocuments({ emailMarketing: true }),
+      Client.aggregate([
+        { $project: { orderCount: { $size: '$orderIds' } } },
+        { $group: { _id: null, total: { $sum: '$orderCount' } } }
+      ]),
+      Newsletter.countDocuments()
+    ]);
+
+    // Obtener todas las órdenes para calcular ingresos
+    const OrderModel = (db as any).OrderModel;
+    const allOrders = await OrderModel.find({
+      status: { $in: ['completed', 'processing', 'pending', 'shipped', 'delivered'] }
+    }).lean();
+
+    console.log('📊 Total órdenes encontradas:', allOrders.length);
+    if (allOrders.length > 0) {
+      console.log('📊 Ejemplo de orden:', {
+        orderId: allOrders[0].orderId,
+        total: allOrders[0].total,
+        totalAmount: allOrders[0].totalAmount,
+        status: allOrders[0].status,
+        createdAt: allOrders[0].createdAt
+      });
+    }
+
+    // Calcular ingresos totales y del periodo
+    let totalRevenue = 0;
+    let periodRevenue = 0;
+    let periodOrders = 0;
+
+    allOrders.forEach((order: any) => {
+      // Intentar con ambos nombres de campo (total y totalAmount)
+      const orderTotal = order.total || order.totalAmount || 0;
+      totalRevenue += orderTotal;
+      
+      const orderDate = new Date(order.createdAt);
+      if (orderDate >= startDate) {
+        periodRevenue += orderTotal;
+        periodOrders++;
+      }
+    });
+
+    console.log('💰 Total revenue calculado:', totalRevenue);
+    console.log('💰 Period revenue calculado:', periodRevenue);
+
+    // Calcular ingresos por mes (últimos 12 meses para gráfico)
+    const monthlyRevenue = [];
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const nextMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      
+      const monthOrders = allOrders.filter((order: any) => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= monthDate && orderDate < nextMonthDate;
+      });
+
+      const revenue = monthOrders.reduce((sum: number, order: any) => {
+        const orderTotal = order.total || order.totalAmount || 0;
+        return sum + orderTotal;
+      }, 0);
+      
+      monthlyRevenue.push({
+        month: monthDate.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }),
+        revenue: parseFloat(revenue.toFixed(2)),
+        orders: monthOrders.length
+      });
+    }
+
+    // Top clientes por gasto - versión mejorada
+    const clientsWithSpending = await Client.aggregate([
+      {
+        $lookup: {
+          from: 'orders',
+          localField: 'orderIds',
+          foreignField: 'orderId',
+          as: 'orderDetails'
+        }
+      },
+      {
+        $addFields: {
+          totalSpent: {
+            $reduce: {
+              input: '$orderDetails',
+              initialValue: 0,
+              in: {
+                $add: [
+                  '$$value',
+                  { $ifNull: ['$$this.total', { $ifNull: ['$$this.totalAmount', 0] }] }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          orderIds: 1,
+          totalSpent: 1,
+          orderCount: { $size: '$orderIds' }
+        }
+      },
+      { $sort: { totalSpent: -1 } },
+      { $limit: 5 }
+    ]);
+
+    console.log('👑 Top clients:', clientsWithSpending.map(c => ({
+      name: c.name,
+      totalSpent: c.totalSpent
+    })));
+
+    return res.json({
+      success: true,
+      stats: {
+        totalClients,
+        totalWithMarketing,
+        totalOrders: totalOrdersCount[0]?.total || 0,
+        newsletterSubscribers: newsletterCount,
+        totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+        periodRevenue: parseFloat(periodRevenue.toFixed(2)),
+        periodOrders,
+        averageOrderValue: periodOrders > 0 ? parseFloat((periodRevenue / periodOrders).toFixed(2)) : 0,
+        monthlyRevenue,
+        topClients: clientsWithSpending.map(c => ({
+          id: c._id,
+          name: c.name,
+          email: c.email,
+          totalSpent: parseFloat((c.totalSpent || 0).toFixed(2)),
+          orderCount: c.orderCount
+        }))
+      }
+    });
+  } catch (e) {
+    console.error('getClientStatsAdmin error', e);
     return res.status(500).json({ error: 'Error interno' });
   }
 }

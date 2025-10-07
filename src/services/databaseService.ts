@@ -153,6 +153,7 @@ interface IOrder extends Document {
     phone: string;
   };
   totalAmount: number;
+  shippingCost?: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   trackingUrl?: string;
@@ -190,6 +191,7 @@ const OrderSchema: Schema = new Schema({
     phone: String,
   },
   totalAmount: { type: Number, required: true },
+  shippingCost: { type: Number, default: 0 },
   status: { type: String, default: 'pending' },
   trackingNumber: String,
   trackingUrl: String,
@@ -481,6 +483,25 @@ class DatabaseService {
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  /**
+   * Obtener órdenes por IDs
+   */
+  async getOrdersByIds(orderIds: string[]): Promise<any[]> {
+    try {
+      if (!orderIds || orderIds.length === 0) {
+        return [];
+      }
+      const orders = await Order.find({ orderId: { $in: orderIds } })
+        .sort({ createdAt: -1 })
+        .lean()
+        .exec();
+      return orders;
+    } catch (error) {
+      console.error('Error al obtener órdenes por IDs:', error);
+      return [];
+    }
   }
 }
 

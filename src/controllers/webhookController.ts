@@ -117,11 +117,14 @@ async function handleCheckoutCompleted(session: any) {
   }
 
   // Actualizar la orden existente usando el orderId personalizado
+  const shippingCost = (session.amount_total - session.amount_subtotal) / 100;
+  
   const updatedOrder = await db.updateOrderByOrderId(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details.email,
     customerName: session.customer_details.name,
     totalAmount: session.amount_total / 100,
+    shippingCost: shippingCost,
     shippingDetails: {
       address: session.customer_details.address?.line1 || '',
       city: session.customer_details.address?.city || '',

@@ -29,6 +29,12 @@ router.delete('/discount-codes/:id', adminAuth, csrfProtection, adminCtrl.delete
 // Newsletter subscribers
 router.get('/newsletter-subscribers', adminAuth, adminCtrl.listNewsletterSubscribers);
 
+// Client management
+router.get('/clients', adminAuth, adminCtrl.listClientsAdmin);
+router.get('/clients/stats', adminAuth, adminCtrl.getClientStatsAdmin);
+router.get('/clients/:id', adminAuth, adminCtrl.getClientDetailsAdmin);
+router.put('/clients/:id', adminAuth, csrfProtection, adminCtrl.updateClientAdmin);
+
 // Session helpers
 router.post('/logout', adminAuth, adminCtrl.logout);
 router.get('/me', adminAuth, adminCtrl.me);
