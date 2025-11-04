@@ -2,7 +2,7 @@
 
 
 import Stripe from 'stripe';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { sendEmail } from './emailService.js';
 import stripeService from './stripeService.js';
 import printifyService from './printifyService.js';
