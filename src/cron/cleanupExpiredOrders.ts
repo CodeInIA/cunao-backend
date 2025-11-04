@@ -1,5 +1,5 @@
 // src/cron/cleanupExpiredOrders.ts
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 dotenv.config();
 import { db } from '../services/databaseService.js';
 import stripeServiceModule from '../services/stripeService.js';
