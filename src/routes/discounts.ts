@@ -1,4 +1,4 @@
-import express from 'express';
+import * as express from 'express';
 import { validateDiscountCode, getDiscountCode, listDiscountCodes } from '../controllers/discountController.js';
 
 const router = express.Router();

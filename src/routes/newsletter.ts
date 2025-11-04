@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ApiResponse } from '../types';
-import crypto from 'crypto';
-import mongoose from 'mongoose';
+import * as crypto from 'crypto';
+import * as mongoose from 'mongoose';
 import Newsletter from '../models/Newsletter.js';
 import { subscribeToNewsletter, sendManualNewsletter, addTestSubscriber, updateMarketingPreferences } from '../controllers/newsletterController.js';
 
