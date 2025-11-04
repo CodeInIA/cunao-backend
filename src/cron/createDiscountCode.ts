@@ -8,7 +8,7 @@ import DiscountCode from '../models/DiscountCode';
 import Newsletter from '../models/Newsletter';
 import { sendEmail } from '../services/emailService';
 import { generateNewsletterToken } from '../routes/newsletter';
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 
 console.log('📦 Módulos cargados correctamente');
 
