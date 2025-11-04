@@ -2,12 +2,12 @@
 
 console.log('🔥 Script iniciado - cargando módulos...');
 
-import readline from 'readline';
-import mongoose from 'mongoose';
-import DiscountCode from '../models/DiscountCode';
-import Newsletter from '../models/Newsletter';
-import { sendEmail } from '../services/emailService';
-import { generateNewsletterToken } from '../routes/newsletter';
+import * as readline from 'readline';
+import * as mongoose from 'mongoose';
+import DiscountCode from '../models/DiscountCode.js';
+import Newsletter from '../models/Newsletter.js';
+import { sendEmail } from '../services/emailService.js';
+import { generateNewsletterToken } from '../routes/newsletter.js';
 import * as dotenv from 'dotenv';
 
 console.log('📦 Módulos cargados correctamente');

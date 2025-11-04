@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 import { db } from '../services/databaseService.js';
 import stripeServiceModule from '../services/stripeService.js';
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 
 /**
  * Ejecuta una limpieza inmediata de órdenes "vacías"/incompletas antiguas.

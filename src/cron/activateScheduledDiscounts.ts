@@ -1,4 +1,4 @@
-import cron from 'node-cron';
+import * as cron from 'node-cron';
 import DiscountCode from '../models/DiscountCode.js';
 import Newsletter from '../models/Newsletter.js';
 import { sendEmail } from '../services/emailService.js';
