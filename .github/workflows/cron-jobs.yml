@@ -39,43 +39,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Cleanup Expired Orders Job
-      run: |
-        echo "Testing cleanup of expired orders"
-        npx tsc --noEmit src/cron/cleanupExpiredOrders.ts
-    
-    - name: Test Cancel Printify Orders Job
-      run: |
-        echo "Testing Printify order cancellation"
-        npx tsc --noEmit src/cron/cancelAllPrintifyOrders.ts
-    
-    - name: Test Create Discount Code Job
-      run: |
-        echo "Testing automatic discount code creation"
-        npx tsc --noEmit src/cron/createDiscountCode.ts
-    
-    - name: Test Activate Scheduled Discounts Job
-      run: |
-        echo "Testing scheduled discount activation"
-        npx tsc --noEmit src/cron/activateScheduledDiscounts.ts
-    
-    - name: Test Weekly Newsletter Job
-      run: |
-        echo "Testing weekly newsletter sending"
-        npx tsc --noEmit src/cron/weeklyNewsletter.ts
-    
-    - name: Test Weekly New Products Job
-      run: |
-        echo "Testing weekly new products notification"
-        npx tsc --noEmit src/cron/weeklyNewProducts.ts
-    
-    - name: Build all cron jobs
+    - name: Build and Type Check
       run: npm run build
-    
-    - name: Verify cron job scheduling
-      run: |
-        echo "Verifying cron job configuration in server.ts"
-        npx tsc --noEmit src/server.ts
     
     - name: Upload test results
       if: always()
