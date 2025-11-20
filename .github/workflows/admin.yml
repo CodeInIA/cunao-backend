@@ -38,34 +38,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Admin Controller
-      run: |
-        echo "Testing admin authentication and authorization"
-        npx tsc --noEmit src/controllers/adminController.ts
-    
-    - name: Test Admin Middleware
-      run: |
-        echo "Testing admin authentication middleware"
-        npx tsc --noEmit src/middleware/adminAuth.ts
-    
-    - name: Test User Model
-      run: |
-        echo "Testing user schema and password hashing"
-        npx tsc --noEmit src/models/User.ts
-    
     - name: Run admin-related unit tests
       run: npm test -- --testPathPattern=admin || echo "No admin tests found"
       continue-on-error: true
     
-    - name: Check admin routes configuration
-      run: |
-        echo "Validating admin routes"
-        npx tsc --noEmit src/routes/admin.ts
-    
-    - name: Test admin creation script
-      run: |
-        echo "Testing admin user creation"
-        npx tsc --noEmit scripts/createAdmin.ts
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Verify JWT token generation
       run: |

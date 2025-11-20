@@ -35,29 +35,17 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Analytics Controller
-      run: |
-        echo "Testing analytics data aggregation and reporting"
-        npx tsc --noEmit src/controllers/analyticsController.ts
-    
     - name: Run analytics-related unit tests
       run: npm test -- --testPathPattern=analytics || echo "No analytics tests found"
       continue-on-error: true
     
-    - name: Check analytics routes configuration
-      run: |
-        echo "Validating analytics routes"
-        npx tsc --noEmit src/routes/analytics.ts
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Verify data aggregation logic
       run: |
         echo "Verifying sales and revenue calculations"
         npm run build
-    
-    - name: Test client data models
-      run: |
-        echo "Testing client data schema"
-        npx tsc --noEmit src/models/Client.ts
     
     - name: Upload test results
       if: always()

@@ -45,41 +45,6 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Database Service
-      run: |
-        echo "Testing MongoDB connection and configuration"
-        npx tsc --noEmit src/services/databaseService.ts
-    
-    - name: Test Client Model
-      run: |
-        echo "Testing Client schema and validations"
-        npx tsc --noEmit src/models/Client.ts
-    
-    - name: Test User Model
-      run: |
-        echo "Testing User schema and password hashing"
-        npx tsc --noEmit src/models/User.ts
-    
-    - name: Test DiscountCode Model
-      run: |
-        echo "Testing DiscountCode schema"
-        npx tsc --noEmit src/models/DiscountCode.ts
-    
-    - name: Test Newsletter Model
-      run: |
-        echo "Testing Newsletter schema"
-        npx tsc --noEmit src/models/Newsletter.ts
-    
-    - name: Test Review Model
-      run: |
-        echo "Testing Review schema"
-        npx tsc --noEmit src/models/Review.ts
-    
-    - name: Test WeeklyProducts Model
-      run: |
-        echo "Testing WeeklyProducts schema"
-        npx tsc --noEmit src/models/WeeklyProducts.ts
-    
     - name: Run database-related unit tests
       run: npm test -- --testPathPattern=model || echo "No model tests found"
       continue-on-error: true

@@ -38,29 +38,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Contact Controller
-      run: |
-        echo "Testing contact form submission and validation"
-        npx tsc --noEmit src/controllers/contactController.ts
-    
-    - name: Test Email Service
-      run: |
-        echo "Testing email sending functionality"
-        npx tsc --noEmit src/services/emailService.ts
-    
-    - name: Test Notification Service
-      run: |
-        echo "Testing notification system"
-        npx tsc --noEmit src/services/notificationService.ts
-    
     - name: Run contact-related unit tests
       run: npm test -- --testPathPattern=contact || echo "No contact tests found"
       continue-on-error: true
     
-    - name: Check contact routes configuration
-      run: |
-        echo "Validating contact routes"
-        npx tsc --noEmit src/routes/contact.ts
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Verify spam protection
       run: |

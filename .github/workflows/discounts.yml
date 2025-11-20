@@ -38,34 +38,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Discount Controller
-      run: |
-        echo "Testing discount code validation and application"
-        npx tsc --noEmit src/controllers/discountController.ts
-    
-    - name: Test Discount Model
-      run: |
-        echo "Testing discount code schema and validations"
-        npx tsc --noEmit src/models/DiscountCode.ts
-    
     - name: Run discount-related unit tests
       run: npm test -- --testPathPattern=discount || echo "No discount tests found"
       continue-on-error: true
     
-    - name: Check discount routes configuration
-      run: |
-        echo "Validating discount routes"
-        npx tsc --noEmit src/routes/discounts.ts
-    
-    - name: Test discount creation cron job
-      run: |
-        echo "Testing automatic discount code generation"
-        npx tsc --noEmit src/cron/createDiscountCode.ts
-    
-    - name: Test scheduled discount activation
-      run: |
-        echo "Testing scheduled discount activation"
-        npx tsc --noEmit src/cron/activateScheduledDiscounts.ts
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Verify discount logic
       run: |

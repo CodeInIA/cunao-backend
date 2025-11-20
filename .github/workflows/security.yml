@@ -33,21 +33,6 @@ jobs:
       run: npm audit --production
       continue-on-error: true
     
-    - name: Test Admin Authentication Middleware
-      run: |
-        echo "Testing admin auth middleware"
-        npx tsc --noEmit src/middleware/adminAuth.ts
-    
-    - name: Test Error Handler Middleware
-      run: |
-        echo "Testing error handling middleware"
-        npx tsc --noEmit src/middleware/errorHandler.ts
-    
-    - name: Verify Security Headers
-      run: |
-        echo "Verifying Helmet security configuration"
-        npx tsc --noEmit src/server.ts
-    
     - name: Check CORS Configuration
       run: |
         echo "Checking CORS settings"

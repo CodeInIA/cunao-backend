@@ -42,34 +42,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Order Controller
-      run: |
-        echo "Testing order creation, validation, and processing"
-        npx tsc --noEmit src/controllers/orderController.ts
-    
-    - name: Test Stripe Service Integration
-      run: |
-        echo "Testing Stripe payment processing"
-        npx tsc --noEmit src/services/stripeService.ts
-    
-    - name: Test Printify Service Integration
-      run: |
-        echo "Testing Printify order creation"
-        npx tsc --noEmit src/services/printifyService.ts
-    
     - name: Run order-related unit tests
       run: npm test -- --testPathPattern=order || echo "No order tests found"
       continue-on-error: true
     
-    - name: Check order routes configuration
-      run: |
-        echo "Validating order routes"
-        npx tsc --noEmit src/routes/orders.ts
-    
-    - name: Test order cleanup cron job
-      run: |
-        echo "Testing expired orders cleanup"
-        npx tsc --noEmit src/cron/cleanupExpiredOrders.ts
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Upload test results
       if: always()

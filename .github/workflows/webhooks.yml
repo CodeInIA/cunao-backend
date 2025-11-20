@@ -37,19 +37,9 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Webhook Controller
-      run: |
-        echo "Testing webhook signature verification and processing"
-        npx tsc --noEmit src/controllers/webhookController.ts
-    
     - name: Run webhook-related unit tests
       run: npm test -- --testPathPattern=webhook || echo "No webhook tests found"
       continue-on-error: true
-    
-    - name: Check webhook routes configuration
-      run: |
-        echo "Validating webhook routes"
-        npx tsc --noEmit src/routes/webhooks.ts
     
     - name: Test webhook hash calculator
       run: |
@@ -57,15 +47,8 @@ jobs:
         node webhook-hash-calculator.js
       continue-on-error: true
     
-    - name: Verify Stripe webhook handling
-      run: |
-        echo "Verifying Stripe event processing"
-        npm run build
-    
-    - name: Verify Printify webhook handling
-      run: |
-        echo "Verifying Printify event processing"
-        npm run build
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Upload test results
       if: always()

@@ -35,34 +35,12 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Test Review Controller
-      run: |
-        echo "Testing review creation, moderation, and listing"
-        npx tsc --noEmit src/controllers/reviewController.ts
-    
-    - name: Test Review Model
-      run: |
-        echo "Testing review schema and validations"
-        npx tsc --noEmit src/models/Review.ts
-    
     - name: Run review-related unit tests
       run: npm test -- --testPathPattern=review || echo "No review tests found"
       continue-on-error: true
     
-    - name: Check review routes configuration
-      run: |
-        echo "Validating review routes"
-        npx tsc --noEmit src/routes/reviews.ts
-    
-    - name: Verify review moderation logic
-      run: |
-        echo "Verifying review approval and rejection logic"
-        npm run build
-    
-    - name: Test rating calculations
-      run: |
-        echo "Testing average rating calculations"
-        npm run build
+    - name: Build and Type Check
+      run: npm run build
     
     - name: Upload test results
       if: always()
