@@ -298,7 +298,7 @@ function generateDiscountEmailHTML(
         <div class="footer">
             <p>Has recibido este email porque aceptaste recibir promociones.</p>
             ${preferencesUrl ? `<p><a href="${preferencesUrl}">Gestionar preferencias de email</a></p>` : ''}
-            <p>© 2025 Cuñadismo Ilustrado - La marca del cuñao auténtico</p>
+            <p>© 2026 Cuñadismo Ilustrado - La marca del cuñao auténtico</p>
         </div>
     </div>
 </body>
