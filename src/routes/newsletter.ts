@@ -234,7 +234,7 @@ router.put('/update-preferences', [
           'preferences.newProducts': newProductsValue
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedNewsletter) {
@@ -323,7 +323,7 @@ router.post('/unsubscribe-all', [
           'preferences.newProducts': false
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updatedNewsletter) {

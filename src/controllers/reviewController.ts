@@ -387,7 +387,7 @@ export async function publishReview(req: Request, res: Response) {
   try {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
     const id = req.params.id;
-    const review = await Review.findByIdAndUpdate(id, { status: 'published' }, { new: true }).exec();
+    const review = await Review.findByIdAndUpdate(id, { status: 'published' }, { returnDocument: 'after' }).exec();
     if (!review) return res.status(404).json({ error: 'No encontrado' });
     return res.json({ success: true, review });
   } catch (e) {

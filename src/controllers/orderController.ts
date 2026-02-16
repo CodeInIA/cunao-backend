@@ -181,6 +181,7 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     customerName: '', // Se actualizará después
     lineItems: secureItemsTemp,
     shippingDetails: {
+      name: '',
       address: '',
       city: '',
       postalCode: '',
@@ -311,11 +312,17 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     }
 
     const customerDetails = session.customer_details;
-    if (!customerDetails || !customerDetails.address) {
-      throw new Error('No se encontraron los detalles de envío del cliente en la sesión de Stripe.');
+    if (!customerDetails) {
+      throw new Error('No se encontraron los detalles del cliente en la sesión de Stripe.');
     }
-
-    const shippingAddress = customerDetails.address;
+    
+    // Obtener la dirección de envío desde collected_information (NO desde customer_details.address que es facturación)
+    const shippingDetails = session.collected_information?.shipping_details;
+    if (!shippingDetails || !shippingDetails.address) {
+      throw new Error('No se encontraron los detalles de envío en la sesión de Stripe.');
+    }
+    
+    const shippingAddress = shippingDetails.address;
     
     // Recuperar el pedido temporal usando el client_reference_id (que es nuestro orderId personalizado)
     const orderId = session.client_reference_id;
@@ -331,14 +338,17 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
     // Actualizar el pedido con la información de pago
     order = await db.updateOrderByOrderId(orderId, {
       stripeSessionId: session.id,
-      customerEmail: customerDetails.email || '',
-      customerName: customerDetails.name || '',
+      customerEmail: customerDetails.email ?? '',
+      customerName: customerDetails.name ?? '',
       shippingDetails: {
-        address: shippingAddress.line1 || '',
-        city: shippingAddress.city || '',
-        postalCode: shippingAddress.postal_code || '',
-        country: shippingAddress.country || '',
-        phone: customerDetails.phone || ''
+        name: shippingDetails.name ?? customerDetails.name ?? '',
+        address: shippingAddress.line1 ?? '',
+        address2: shippingAddress.line2 ?? undefined,
+        city: shippingAddress.city ?? '',
+        state: shippingAddress.state ?? undefined,
+        postalCode: shippingAddress.postal_code ?? '',
+        country: shippingAddress.country ?? '',
+        phone: customerDetails.phone ?? ''
       },
       totalAmount: session.amount_total ? session.amount_total / 100 : 0,
       status: 'processing'
@@ -385,8 +395,8 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
       is_printify_express: false,
       send_shipping_notification: true,
       address_to: {
-        first_name: customerDetails.name?.split(' ')[0] || '',
-        last_name: customerDetails.name?.split(' ').slice(1).join(' ') || '',
+        first_name: shippingDetails.name?.split(' ')[0] || '',
+        last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || '',
         email: customerDetails.email || '',
         phone: customerDetails.phone || '',
         country: shippingAddress.country || '',

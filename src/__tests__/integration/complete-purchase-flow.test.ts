@@ -15,6 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/glo
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import nock from 'nock';
+import Stripe from 'stripe';
 
 // Importar servicios
 import printifyServiceModule from '../../services/printifyService.js';
@@ -180,6 +181,7 @@ describe('🛒 FLUJO COMPLETO DE COMPRA - TEST DE INTEGRACIÓN', () => {
           price: 24.99
         }],
         shippingDetails: {
+          name: 'Test User',
           address: 'Calle Test 123',
           city: 'Madrid',
           postalCode: '28001',
@@ -275,6 +277,7 @@ describe('🛒 FLUJO COMPLETO DE COMPRA - TEST DE INTEGRACIÓN', () => {
           price: 24.99
         }],
         shippingDetails: {
+          name: '',
           address: '',
           city: '',
           postalCode: '',
@@ -291,6 +294,7 @@ describe('🛒 FLUJO COMPLETO DE COMPRA - TEST DE INTEGRACIÓN', () => {
         customerEmail: 'webhook@example.com',
         customerName: 'Webhook Usuario',
         shippingDetails: {
+          name: 'Webhook Usuario',
           address: 'Webhook Street 456',
           city: 'Barcelona',
           postalCode: '08001',
@@ -305,6 +309,87 @@ describe('🛒 FLUJO COMPLETO DE COMPRA - TEST DE INTEGRACIÓN', () => {
       expect(updatedOrder?.customerName).toBe('Webhook Usuario');
       expect(updatedOrder?.shippingDetails.city).toBe('Barcelona');
       expect(updatedOrder?.shippingDetails.postalCode).toBe('08001');
+    });
+
+    it('🔒 debería extraer SHIPPING address desde collected_information.shipping_details, NO desde customer_details', async () => {
+      // Mock realista de sesión de Stripe con AMBAS direcciones (usando tipos oficiales de Stripe)
+      const mockStripeSession: Partial<Stripe.Checkout.Session> = {
+        id: 'cs_test_shipping_validation',
+        // ❌ Dirección de FACTURACIÓN (billing)
+        customer_details: {
+          name: 'Juan Facturación',
+          email: 'facturacion@example.com',
+          phone: '+34600111111',
+          address: {
+            line1: 'Calle Facturación 100',
+            line2: 'Oficina 5',
+            city: 'Madrid',
+            state: 'Madrid',
+            postal_code: '28001',
+            country: 'ES'
+          }
+        } as Stripe.Checkout.Session.CustomerDetails,
+        // ✅ Dirección de ENVÍO (shipping) - DEBE USARSE
+        collected_information: {
+          shipping_details: {
+            name: 'María Envío',
+            address: {
+              line1: 'Calle Envío 200',
+              line2: 'Piso 3A',
+              city: 'Barcelona',
+              state: 'Barcelona',
+              postal_code: '08001',
+              country: 'ES'
+            }
+          }
+        } as Stripe.Checkout.Session.CollectedInformation
+      };
+
+      // Simular extracción de datos como lo hace webhookController
+      const shippingDetails = {
+        name: mockStripeSession.collected_information?.shipping_details?.name ?? mockStripeSession.customer_details?.name ?? '',
+        address: mockStripeSession.collected_information?.shipping_details?.address?.line1 ?? '',
+        address2: mockStripeSession.collected_information?.shipping_details?.address?.line2,
+        city: mockStripeSession.collected_information?.shipping_details?.address?.city ?? '',
+        state: mockStripeSession.collected_information?.shipping_details?.address?.state,
+        postalCode: mockStripeSession.collected_information?.shipping_details?.address?.postal_code ?? '',
+        country: mockStripeSession.collected_information?.shipping_details?.address?.country ?? '',
+        phone: mockStripeSession.customer_details?.phone ?? ''
+      };
+
+      // ✅ DEBE usar datos de ENVÍO
+      expect(shippingDetails.name).toBe('María Envío');
+      expect(shippingDetails.address).toBe('Calle Envío 200');
+      expect(shippingDetails.address2).toBe('Piso 3A');
+      expect(shippingDetails.city).toBe('Barcelona');
+      expect(shippingDetails.state).toBe('Barcelona');
+      expect(shippingDetails.postalCode).toBe('08001');
+      expect(shippingDetails.country).toBe('ES');
+
+      // ❌ NO DEBE contener datos de facturación
+      expect(shippingDetails.name).not.toBe('Juan Facturación');
+      expect(shippingDetails.address).not.toBe('Calle Facturación 100');
+      expect(shippingDetails.city).not.toBe('Madrid');
+
+      // Validar que se mapee correctamente a Printify
+      const printifyAddress = {
+        first_name: shippingDetails.name?.split(' ')[0] || '',
+        last_name: shippingDetails.name?.split(' ').slice(1).join(' ') || '',
+        email: mockStripeSession.customer_details?.email || '',
+        phone: shippingDetails.phone || '',
+        country: shippingDetails.country || '',
+        region: shippingDetails.state || '',
+        address1: shippingDetails.address || '',
+        address2: shippingDetails.address2 || '',
+        city: shippingDetails.city || '',
+        zip: shippingDetails.postalCode || ''
+      };
+
+      expect(printifyAddress.first_name).toBe('María');
+      expect(printifyAddress.last_name).toBe('Envío');
+      expect(printifyAddress.address1).toBe('Calle Envío 200');
+      expect(printifyAddress.city).toBe('Barcelona');
+      expect(printifyAddress.region).toBe('Barcelona');
     });
   });
 
@@ -388,6 +473,7 @@ describe('🛒 FLUJO COMPLETO DE COMPRA - TEST DE INTEGRACIÓN', () => {
           price: cart[0].price
         }],
         shippingDetails: {
+          name: 'Test User E2E',
           address: 'Calle E2E 999',
           city: 'Valencia',
           postalCode: '46001',

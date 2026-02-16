@@ -146,8 +146,11 @@ interface IOrder extends Document {
     price: number;
   }[];
   shippingDetails: {
+    name: string;
     address: string;
+    address2?: string;
     city: string;
+    state?: string;
     postalCode: string;
     country: string;
     phone: string;
@@ -187,8 +190,11 @@ const OrderSchema: Schema = new Schema({
     price: Number,
   }],
   shippingDetails: {
+    name: String,
     address: String,
+    address2: String,
     city: String,
+    state: String,
     postalCode: String,
     country: String,
     phone: String,
@@ -260,12 +266,12 @@ class DatabaseService {
 
   // Actualizar orden por order_id personalizado
   public async updateOrderByOrderId(orderId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ orderId }, updateData, { new: true }).exec();
+    return Order.findOneAndUpdate({ orderId }, updateData, { returnDocument: 'after' }).exec();
   }
 
   // Actualizar pedido por _id
   public async findOrderByIdAndUpdate(orderId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
-    return Order.findByIdAndUpdate(orderId, updateData, { new: true }).exec();
+    return Order.findByIdAndUpdate(orderId, updateData, { returnDocument: 'after' }).exec();
   }
   private static instance: DatabaseService;
 
@@ -302,11 +308,11 @@ class DatabaseService {
   
   // Crear un token de review para una orden
   public async createReviewTokenForOrder(orderId: string, token: string, expiresAt: Date): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ orderId }, { reviewToken: { token, createdAt: new Date(), expiresAt, used: false } }, { new: true }).exec();
+    return Order.findOneAndUpdate({ orderId }, { reviewToken: { token, createdAt: new Date(), expiresAt, used: false } }, { returnDocument: 'after' }).exec();
   }
 
   public async markReviewTokenUsed(orderId: string): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ orderId }, { 'reviewToken.used': true, 'reviewToken.submittedAt': new Date() }, { new: true }).exec();
+    return Order.findOneAndUpdate({ orderId }, { 'reviewToken.used': true, 'reviewToken.submittedAt': new Date() }, { returnDocument: 'after' }).exec();
   }
 
   public async findOrderByReviewToken(token: string): Promise<IOrder | null> {
@@ -314,12 +320,12 @@ class DatabaseService {
   }
 
   public async clearReviewToken(orderId: string): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ orderId }, { $unset: { reviewToken: '' } }, { new: true }).exec();
+    return Order.findOneAndUpdate({ orderId }, { $unset: { reviewToken: '' } }, { returnDocument: 'after' }).exec();
   }
   
   // NUEVA FUNCIÓN para encontrar un pedido por el ID de sesión de Stripe y actualizarlo
   public async findOrderByStripeIdAndUpdate(stripeId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ stripeSessionId: stripeId }, updateData, { new: true }).exec();
+    return Order.findOneAndUpdate({ stripeSessionId: stripeId }, updateData, { returnDocument: 'after' }).exec();
   }
 
   public async findOrderByPrintifyId(printifyId: string): Promise<IOrder | null> {
@@ -327,7 +333,7 @@ class DatabaseService {
   }
 
   public async updateOrderByPrintifyId(printifyId: string, updateData: Partial<IOrder>): Promise<IOrder | null> {
-    return Order.findOneAndUpdate({ printifyOrderId: printifyId }, updateData, { new: true }).exec();
+    return Order.findOneAndUpdate({ printifyOrderId: printifyId }, updateData, { returnDocument: 'after' }).exec();
   }
 
   // === MÉTODOS PARA PRODUCTOS ===
@@ -383,7 +389,7 @@ class DatabaseService {
 
   // Actualizar solo tags de un producto
   public async updateProductTags(printifyId: string, tags: string[]): Promise<IProduct | null> {
-    return Product.findOneAndUpdate({ printifyId }, { $set: { tags } }, { new: true }).exec();
+    return Product.findOneAndUpdate({ printifyId }, { $set: { tags } }, { returnDocument: 'after' }).exec();
   }
 
   /**

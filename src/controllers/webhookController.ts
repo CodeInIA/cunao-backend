@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
+import Stripe from 'stripe';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import stripeServiceModule from '../services/stripeService.js';
 import printifyServiceModule from '../services/printifyService.js';
@@ -57,7 +58,7 @@ export const handleStripeWebhook = asyncHandler(async (req: Request, res: Respon
     // Procesa el evento en segundo plano
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(event.data.object);
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       // Puedes añadir más casos si los necesitas
       default:
@@ -106,7 +107,7 @@ export const handlePrintifyWebhook = asyncHandler(async (req: Request, res: Resp
 // --- Lógica de Negocio (Helpers) ---
 
 // Stripe
-async function handleCheckoutCompleted(session: any) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   console.log('Checkout completado:', session.id);
 
   // Usar client_reference_id para actualizar la orden existente (ahora es nuestro orderId personalizado)
@@ -117,7 +118,7 @@ async function handleCheckoutCompleted(session: any) {
   }
 
   // Actualizar la orden existente usando el orderId personalizado
-  const shippingCost = (session.amount_total - session.amount_subtotal) / 100;
+  const shippingCost = ((session.amount_total ?? 0) - (session.amount_subtotal ?? 0)) / 100;
   
   // Calcular el descuento aplicado
   const discountCode = session.metadata?.discount_code || '';
@@ -143,20 +144,23 @@ async function handleCheckoutCompleted(session: any) {
   
   const updatedOrder = await db.updateOrderByOrderId(orderId, {
     stripeSessionId: session.id,
-    customerEmail: session.customer_details.email,
-    customerName: session.customer_details.name,
-    totalAmount: session.amount_total / 100,
+    customerEmail: session.customer_details?.email ?? undefined,
+    customerName: session.customer_details?.name ?? undefined,
+    totalAmount: (session.amount_total ?? 0) / 100,
     shippingCost: shippingCost,
-    discountCode: discountCode || undefined,
+    discountCode: discountCode,
     discountPercentage: discountPercentage,
     discountAppliesTo: discountAppliesTo,
     discountAmount: discountAmount > 0 ? discountAmount : undefined,
     shippingDetails: {
-      address: session.customer_details.address?.line1 || '',
-      city: session.customer_details.address?.city || '',
-      postalCode: session.customer_details.address?.postal_code || '',
-      country: session.customer_details.address?.country || '',
-      phone: session.customer_details.phone || '',
+      name: session.collected_information?.shipping_details?.name ?? session.customer_details?.name ?? '',
+      address: session.collected_information?.shipping_details?.address?.line1 ?? '',
+      address2: session.collected_information?.shipping_details?.address?.line2 ?? undefined,
+      city: session.collected_information?.shipping_details?.address?.city ?? '',
+      state: session.collected_information?.shipping_details?.address?.state ?? undefined,
+      postalCode: session.collected_information?.shipping_details?.address?.postal_code ?? '',
+      country: session.collected_information?.shipping_details?.address?.country ?? '',
+      phone: session.customer_details?.phone ?? '',
     },
     status: 'pending'
   });
@@ -185,8 +189,8 @@ async function handleCheckoutCompleted(session: any) {
         
         // Registrar quién usó el cupón
         const usageRecord = {
-          email: session.customer_details.email || '',
-          name: session.customer_details.name || undefined,
+          email: session.customer_details?.email ?? '',
+          name: session.customer_details?.name ?? undefined,
           usedAt: new Date()
         };
         
@@ -209,10 +213,10 @@ async function handleCheckoutCompleted(session: any) {
 
   // Guardar o actualizar datos del cliente
   try {
-    const customerEmail = session.customer_details.email;
-    const customerName = session.customer_details.name;
-    const address = session.customer_details.address;
-    const phone = session.customer_details.phone;
+    const customerEmail = session.customer_details?.email;
+    const customerName = session.customer_details?.name;
+    const address = session.customer_details?.address;
+    const phone = session.customer_details?.phone;
     
     // Obtener metadata de email marketing del session
     const emailMarketing = session.metadata?.email_marketing === 'true';
@@ -251,8 +255,9 @@ async function handleCheckoutCompleted(session: any) {
       }
       
       // Actualizar información de pago
-      existingClient.paymentInfo.stripeCustomerId = session.customer || existingClient.paymentInfo.stripeCustomerId;
-      existingClient.paymentInfo.lastPaymentMethod = session.payment_method_types?.[0] || existingClient.paymentInfo.lastPaymentMethod;
+      const customerId = typeof session.customer === 'string' ? session.customer : undefined;
+      existingClient.paymentInfo.stripeCustomerId = customerId ?? existingClient.paymentInfo.stripeCustomerId;
+      existingClient.paymentInfo.lastPaymentMethod = session.payment_method_types?.[0] ?? existingClient.paymentInfo.lastPaymentMethod;
       
       await existingClient.save();
       console.log(`Cliente actualizado: ${customerEmail}`);
