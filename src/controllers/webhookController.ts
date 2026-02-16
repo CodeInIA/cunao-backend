@@ -214,8 +214,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Guardar o actualizar datos del cliente
   try {
     const customerEmail = session.customer_details?.email;
-    const customerName = session.customer_details?.name;
-    const address = session.customer_details?.address;
+    const customerName = session.collected_information?.shipping_details?.name ?? session.customer_details?.name;
+    const shippingAddress = session.collected_information?.shipping_details?.address;
     const phone = session.customer_details?.phone;
     
     // Obtener metadata de email marketing del session
@@ -259,6 +259,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       existingClient.paymentInfo.stripeCustomerId = customerId ?? existingClient.paymentInfo.stripeCustomerId;
       existingClient.paymentInfo.lastPaymentMethod = session.payment_method_types?.[0] ?? existingClient.paymentInfo.lastPaymentMethod;
       
+      // Actualizar dirección de envío y teléfono con los datos más recientes
+      if (shippingAddress) {
+        existingClient.address = {
+          line1: shippingAddress.line1 || existingClient.address.line1,
+          line2: shippingAddress.line2 || existingClient.address.line2,
+          city: shippingAddress.city || existingClient.address.city,
+          state: shippingAddress.state || existingClient.address.state,
+          postal_code: shippingAddress.postal_code || existingClient.address.postal_code,
+          country: shippingAddress.country || existingClient.address.country,
+        };
+      }
+      if (phone) existingClient.phone = phone;
+      if (customerName) existingClient.name = customerName;
+
       await existingClient.save();
       console.log(`Cliente actualizado: ${customerEmail}`);
     } else {
@@ -291,12 +305,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         email: customerEmail,
         phone: phone || '',
         address: {
-          line1: address?.line1 || '',
-          line2: address?.line2 || '',
-          city: address?.city || '',
-          state: address?.state || '',
-          postal_code: address?.postal_code || '',
-          country: address?.country || ''
+          line1: shippingAddress?.line1 || '',
+          line2: shippingAddress?.line2 || '',
+          city: shippingAddress?.city || '',
+          state: shippingAddress?.state || '',
+          postal_code: shippingAddress?.postal_code || '',
+          country: shippingAddress?.country || ''
         },
         paymentInfo: {
           stripeCustomerId: session.customer || '',
