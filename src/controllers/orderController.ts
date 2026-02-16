@@ -152,6 +152,18 @@ export const createCheckoutSession = asyncHandler(async (req: Request, res: Resp
     if (!variant || typeof variant.id === 'undefined') {
       throw new Error(`Variante con ID ${item.variantId} no válida o sin ID para el producto ${item.productId}.`);
     }
+    // Validar que la variante esté disponible (stock del proveedor)
+    if (!variant.is_available) {
+      const sizeOpt = product.options.find((opt: ProductOption) => opt.type === 'size');
+      const colorOpt = product.options.find((opt: ProductOption) => opt.type === 'color');
+      const sizeName = sizeOpt?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
+      const colorName = colorOpt?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';
+      throw new Error(`La variante "${product.title} - ${colorName} ${sizeName}" está agotada. Por favor, selecciona otra opción.`);
+    }
+    // Validar que la variante esté habilitada
+    if (!variant.is_enabled) {
+      throw new Error(`La variante con ID ${item.variantId} no está disponible para la venta.`);
+    }
     const sizeOption = product.options.find((opt: ProductOption) => opt.type === 'size');
     const colorOption = product.options.find((opt: ProductOption) => opt.type === 'color');
     const size = sizeOption?.values.find((val: OptionValue) => variant.options.includes(val.id))?.title || '';

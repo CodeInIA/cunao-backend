@@ -25,6 +25,7 @@ import { startNewsletterScheduler } from './cron/weeklyNewsletter.js';
 import { startNewProductsEmailScheduler } from './cron/weeklyNewProducts.js';
 import { startCleanupScheduler } from './cron/cleanupExpiredOrders.js';
 import { startScheduledDiscountActivator } from './cron/activateScheduledDiscounts.js';
+import { startStockSyncScheduler } from './cron/syncProductStock.js';
 
 db.connect();
 
@@ -137,4 +138,7 @@ app.listen(PORT, () => {
   
   // Inicializar scheduler de activación de cupones programados
   startScheduledDiscountActivator();
+  
+  // Inicializar scheduler de sincronización de stock con Printify
+  startStockSyncScheduler();
 });
