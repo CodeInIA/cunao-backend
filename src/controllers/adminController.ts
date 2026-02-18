@@ -1386,6 +1386,23 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
       }
     ]);
 
+    // 9. Estadísticas de métodos de pago más usados
+    const paymentMethodStats = await OrderModel.aggregate([
+      {
+        $match: {
+          status: { $in: ['processing', 'shipped', 'delivered'] },
+          'paymentMethod.provider': { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: '$paymentMethod.provider',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
     return res.json({
       success: true,
       stats: {
@@ -1422,6 +1439,9 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
           return acc;
         }, {}),
         
+        // Métodos de pago
+        paymentMethodStats: paymentMethodStats.map((p: { _id: string; count: number }) => ({ provider: p._id, count: p.count })),
+
         // Gráficos y rankings
         monthlyRevenue,
         topClients: clientsWithSpending.map(c => ({
