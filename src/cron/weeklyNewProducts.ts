@@ -458,6 +458,19 @@ export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
   }
 };
 
+// Limpia productos de semanas anteriores a la semana actual
+const cleanupOldWeeklyProducts = async (): Promise<void> => {
+  try {
+    const currentWeek = getWeekYear();
+    const deleteResult = await WeeklyProduct.deleteMany({ weekYear: { $ne: currentWeek } });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`🗑️ Limpieza de semanas anteriores: ${deleteResult.deletedCount} productos eliminados (semana actual: ${currentWeek})`);
+    }
+  } catch (error) {
+    console.error('❌ Error limpiando productos de semanas anteriores:', error);
+  }
+};
+
 // Función para agregar un producto a la colección semanal
 export const addWeeklyProduct = async (productData: {
   productId: string;
@@ -470,6 +483,9 @@ export const addWeeklyProduct = async (productData: {
 }): Promise<boolean> => {
   try {
     const currentWeek = getWeekYear();
+
+    // Limpiar productos de semanas anteriores antes de añadir
+    await cleanupOldWeeklyProducts();
     
     // Verificar si ya existe el producto
     const existingProduct = await WeeklyProduct.findOne({ 
@@ -519,6 +535,9 @@ export const sendNewProductsEmailManual = async (): Promise<void> => {
 // Scheduler para envío automático de email de nuevos productos
 export const startNewProductsEmailScheduler = (): void => {
   console.log('🕒 Iniciando scheduler de email de nuevos productos...');
+
+  // Limpiar productos de semanas pasadas al arrancar
+  cleanupOldWeeklyProducts();
   
   const isDevelopment = process.env.NODE_ENV !== 'production';
   
