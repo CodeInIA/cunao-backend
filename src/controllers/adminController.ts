@@ -1242,19 +1242,8 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
     // Obtener todas las órdenes para calcular ingresos
     const OrderModel = (db as any).OrderModel;
     const allOrders = await OrderModel.find({
-      status: { $in: ['completed', 'processing', 'pending', 'shipped', 'delivered'] }
+      status: { $in: ['processing', 'shipped', 'delivered'] }
     }).lean();
-
-    console.log('📊 Total órdenes encontradas:', allOrders.length);
-    if (allOrders.length > 0) {
-      console.log('📊 Ejemplo de orden:', {
-        orderId: allOrders[0].orderId,
-        total: allOrders[0].total,
-        totalAmount: allOrders[0].totalAmount,
-        status: allOrders[0].status,
-        createdAt: allOrders[0].createdAt
-      });
-    }
 
     // Calcular ingresos totales y del periodo
     let totalRevenue = 0;
@@ -1272,9 +1261,6 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
         periodOrders++;
       }
     });
-
-    console.log('💰 Total revenue calculado:', totalRevenue);
-    console.log('💰 Period revenue calculado:', periodRevenue);
 
     // Calcular ingresos por mes (últimos 12 meses para gráfico)
     const monthlyRevenue = [];
@@ -1311,9 +1297,20 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
       },
       {
         $addFields: {
+          paidOrders: {
+            $filter: {
+              input: '$orderDetails',
+              as: 'order',
+              cond: { $in: ['$$order.status', ['processing', 'shipped', 'delivered']] }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
           totalSpent: {
             $reduce: {
-              input: '$orderDetails',
+              input: '$paidOrders',
               initialValue: 0,
               in: {
                 $add: [
@@ -1331,17 +1328,12 @@ export async function getClientStatsAdmin(req: Request, res: Response) {
           email: 1,
           orderIds: 1,
           totalSpent: 1,
-          orderCount: { $size: '$orderIds' }
+          orderCount: { $size: '$paidOrders' }
         }
       },
       { $sort: { totalSpent: -1 } },
       { $limit: 5 }
     ]);
-
-    console.log('👑 Top clients:', clientsWithSpending.map(c => ({
-      name: c.name,
-      totalSpent: c.totalSpent
-    })));
 
     // Nuevas estadísticas adicionales
     // 1. Clientes nuevos en el periodo
