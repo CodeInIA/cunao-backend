@@ -3,6 +3,7 @@ import Newsletter, { INewsletter } from '../models/Newsletter.js';
 import { sendEmail } from '../services/emailService.js';
 import { generateNewsletterToken } from '../routes/newsletter.js';
 import { getEmailImageUrl } from '../utils/imageUtils.js';
+import { db, IProduct } from '../services/databaseService.js';
 
 // Función slugify para crear URLs amigables
 const slugify = (text: string): string => {
@@ -35,7 +36,7 @@ const getWeekYear = (date: Date = new Date()): string => {
 };
 
 // Función para generar el contenido HTML del email de nuevos productos
-const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferencesUrl?: string) => {
+const generateNewProductsEmailContent = (products: IProduct[], preferencesUrl?: string) => {
   const config = {
     frontend: {
       url: 'https://www.cunadismoilustrado.me'
@@ -295,12 +296,15 @@ const generateNewProductsEmailContent = (products: IWeeklyProduct[], preferences
                 
                 <!-- Products Grid -->
                 <div class="products-grid">
-                    ${featuredProducts.map(product => `
+                    ${featuredProducts.map((product: IProduct) => {
+                        const defaultImage = product.images?.find((img) => img.is_default) || product.images?.[0];
+                        const imageUrl = defaultImage?.cdnUrls?.medium || defaultImage?.cdnUrl || defaultImage?.src || '';
+                        return `
                         <a href="${config.frontend.url}/producto/${slugify(product.title)}" class="product-card">
-                            <img src="${getEmailImageUrl(product.imageUrl)}" alt="${product.title}" class="product-image" />
+                            <img src="${getEmailImageUrl(imageUrl)}" alt="${product.title}" class="product-image" />
                             <div class="product-title">${product.title}</div>
-                        </a>
-                    `).join('')}
+                        </a>`;
+                    }).join('')}
                 </div>
                 
                 <a href="${config.frontend.url}/productos" class="cta-button">
@@ -348,17 +352,44 @@ const getNewProductsSubscribers = async (): Promise<NewProductsSubscriber[]> => 
   }
 };
 
-// Función para obtener productos de la semana actual
-const getWeeklyProducts = async (weekYear?: string): Promise<IWeeklyProduct[]> => {
+// Limpia productos de semanas anteriores a la semana actual
+const cleanupOldWeeklyProducts = async (): Promise<void> => {
+  try {
+    const currentWeek = getWeekYear();
+    const deleteResult = await WeeklyProduct.deleteMany({ weekYear: { $ne: currentWeek } });
+    if (deleteResult.deletedCount > 0) {
+      console.log(`🗑️ Limpieza de semanas anteriores: ${deleteResult.deletedCount} productos eliminados (semana actual: ${currentWeek})`);
+    }
+  } catch (error) {
+    console.error('❌ Error limpiando productos de semanas anteriores:', error);
+  }
+};
+
+// Función para obtener productos de la semana actual con sus datos completos desde la colección Product
+const getWeeklyProducts = async (weekYear?: string): Promise<IProduct[]> => {
   try {
     const targetWeek = weekYear || getWeekYear();
-    
-    const products = await WeeklyProduct.find({ weekYear: targetWeek })
-      .sort({ publishedAt: -1 }) // Más recientes primero
-      .limit(10); // Máximo 10 productos por semana
-    
-    console.log(`📦 Encontrados ${products.length} productos para la semana ${targetWeek}`);
-    return products;
+
+    const weeklyRefs = await WeeklyProduct.find({ weekYear: targetWeek })
+      .sort({ publishedAt: -1 })
+      .limit(10)
+      .lean();
+
+    if (weeklyRefs.length === 0) {
+      console.log(`📦 No hay productos para la semana ${targetWeek}`);
+      return [];
+    }
+
+    // Obtener datos completos de cada producto desde la colección Product
+    const products = await Promise.all(
+      weeklyRefs.map(ref => db.getProductByPrintifyId(ref.printifyId))
+    );
+
+    // Filtrar nulls (producto eliminado de Product pero aún referenciado)
+    const validProducts = products.filter((p): p is IProduct => p !== null);
+
+    console.log(`📦 Encontrados ${validProducts.length} productos para la semana ${targetWeek}`);
+    return validProducts;
   } catch (error) {
     console.error('❌ Error obteniendo productos semanales:', error);
     return [];
@@ -369,7 +400,10 @@ const getWeeklyProducts = async (weekYear?: string): Promise<IWeeklyProduct[]> =
 export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
   try {
     console.log('📧 Iniciando envío de email de nuevos productos...');
-    
+
+    // Limpiar siempre productos de semanas anteriores al ejecutar el cron
+    await cleanupOldWeeklyProducts();
+
     // Obtener productos de la semana actual
     const currentWeek = getWeekYear();
     const weeklyProducts = await getWeeklyProducts(currentWeek);
@@ -384,11 +418,12 @@ export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
     
     if (subscribers.length === 0) {
       console.log('📧 No hay suscriptores con nuevos productos activado');
+      await WeeklyProduct.deleteMany({ weekYear: currentWeek });
       return;
     }
 
     console.log(`📧 Enviando email de nuevos productos a ${subscribers.length} suscriptores...`);
-    console.log(`📦 Productos destacados: ${weeklyProducts.slice(0, 3).map(p => p.title).join(', ')}`);
+    console.log(`📦 Productos destacados: ${weeklyProducts.slice(0, 3).map((p: IProduct) => p.title).join(', ')}`);
     
     let emailsSent = 0;
     let emailsFailed = 0;
@@ -458,67 +493,26 @@ export const sendWeeklyNewProductsEmail = async (): Promise<void> => {
   }
 };
 
-// Limpia productos de semanas anteriores a la semana actual
-const cleanupOldWeeklyProducts = async (): Promise<void> => {
-  try {
-    const currentWeek = getWeekYear();
-    const deleteResult = await WeeklyProduct.deleteMany({ weekYear: { $ne: currentWeek } });
-    if (deleteResult.deletedCount > 0) {
-      console.log(`🗑️ Limpieza de semanas anteriores: ${deleteResult.deletedCount} productos eliminados (semana actual: ${currentWeek})`);
-    }
-  } catch (error) {
-    console.error('❌ Error limpiando productos de semanas anteriores:', error);
-  }
-};
-
-// Función para agregar un producto a la colección semanal
-export const addWeeklyProduct = async (productData: {
-  productId: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  price: number;
-  printifyProductId: string;
-  tags?: string[];
-}): Promise<boolean> => {
+// Función para agregar un producto a la colección semanal (solo guarda la referencia printifyId)
+export const addWeeklyProduct = async (printifyId: string): Promise<boolean> => {
   try {
     const currentWeek = getWeekYear();
 
-    // Limpiar productos de semanas anteriores antes de añadir
-    await cleanupOldWeeklyProducts();
-    
-    // Verificar si ya existe el producto
-    const existingProduct = await WeeklyProduct.findOne({ 
-      productId: productData.productId 
-    });
-    
-    if (existingProduct) {
-      // Actualizar producto existente con la nueva información
-      const updateData = {
-        ...productData,
-        weekYear: currentWeek,
-        tags: productData.tags || [],
-        publishedAt: new Date() // Actualizar fecha de publicación
-      };
-      
-      await WeeklyProduct.updateOne(
-        { productId: productData.productId },
-        { $set: updateData }
-      );
-      
-      console.log(`🔄 Producto actualizado en productos semanales: ${productData.title} (Semana: ${currentWeek})`);
-      return true;
+    // Verificar que el producto existe en la colección Product
+    const product = await db.getProductByPrintifyId(printifyId);
+    if (!product) {
+      console.error(`❌ No se encontró el producto ${printifyId} en la colección Product`);
+      return false;
     }
 
-    // Crear nuevo producto semanal
-    const newWeeklyProduct = new WeeklyProduct({
-      ...productData,
-      weekYear: currentWeek,
-      tags: productData.tags || []
-    });
+    // Upsert: si ya existe actualizar weekYear y publishedAt, si no crear
+    await WeeklyProduct.findOneAndUpdate(
+      { printifyId },
+      { printifyId, weekYear: currentWeek, publishedAt: new Date() },
+      { upsert: true, new: true }
+    );
 
-    await newWeeklyProduct.save();
-    console.log(`✅ Producto agregado a productos semanales: ${productData.title} (Semana: ${currentWeek})`);
+    console.log(`✅ Producto ${product.title} (${printifyId}) agregado a productos semanales (Semana: ${currentWeek})`);
     return true;
   } catch (error) {
     console.error(`❌ Error agregando producto semanal:`, error);

@@ -579,38 +579,8 @@ async function handleProductPublishStarted(resource: any) {
         // Agregar automáticamente a productos semanales para email de nuevos productos
         try {
             const { addWeeklyProduct } = await import('../cron/weeklyNewProducts.js');
-            
-            // Preparar datos del producto para la colección semanal
-            const enabledVariants = fullProduct.variants?.filter((v: any) => v.is_enabled) || [];
-            
-            // Encontrar la imagen por defecto - priorizar CDN si está disponible
-            const defaultImage = processedImages.find((img: any) => img.is_default) || processedImages[0];
-            const imageUrl = defaultImage?.cdnUrls?.medium || defaultImage?.cdnUrl || defaultImage?.src || '';
-            
-            // Encontrar la variante que corresponde a la imagen por defecto
-            let selectedVariant = enabledVariants[0]; // fallback
-            if (defaultImage?.variant_ids && defaultImage.variant_ids.length > 0) {
-                const imageVariantId = defaultImage.variant_ids[0];
-                const imageVariant = enabledVariants.find((v: any) => v.id === imageVariantId);
-                if (imageVariant) {
-                    selectedVariant = imageVariant;
-                }
-            }
-            
-            // Usar el precio de la variante seleccionada o el precio mínimo como fallback
-            const priceToUse = selectedVariant?.price || Math.min(...enabledVariants.map((v: any) => v.price || Infinity));
-            
-            const weeklyProductData = {
-                productId: productId,
-                title: fullProduct.title,
-                description: fullProduct.description || '',
-                imageUrl: imageUrl,
-                price: priceToUse / 100, // Convertir de centavos a euros
-                printifyProductId: productId,
-                tags: fullProduct.tags || []
-            };
 
-            const addedToWeekly = await addWeeklyProduct(weeklyProductData);
+            const addedToWeekly = await addWeeklyProduct(productId);
             
             if (addedToWeekly) {
                 console.log(`✅ Producto ${productId} agregado automáticamente a productos semanales`);

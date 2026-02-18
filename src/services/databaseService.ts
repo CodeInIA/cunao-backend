@@ -3,7 +3,7 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 // --- Interfaz para definir la estructura de un Producto ---
-interface IProduct extends Document {
+export interface IProduct extends Document {
   printifyId: string;
   title: string;
   description: string;

@@ -3,38 +3,22 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { ApiResponse } from '../types';
 import { addWeeklyProduct, sendNewProductsEmailManual } from '../cron/weeklyNewProducts.js';
 import WeeklyProduct from '../models/WeeklyProducts.js';
+import { db, IProduct } from '../services/databaseService.js';
 
 // Agregar producto a la colección semanal
 export const addProductToWeekly = asyncHandler(async (req: Request, res: Response) => {
-  const { 
-    productId, 
-    title, 
-    description, 
-    imageUrl, 
-    price, 
-    printifyProductId, 
-    tags 
-  } = req.body;
+  const { printifyId } = req.body;
 
-  // Validación de campos requeridos
-  if (!productId || !title || !description || !imageUrl || !price || !printifyProductId) {
+  if (!printifyId) {
     const response: ApiResponse<null> = {
       success: false,
-      error: 'Faltan campos requeridos: productId, title, description, imageUrl, price, printifyProductId'
+      error: 'Falta el campo requerido: printifyId'
     };
     return res.status(400).json(response);
   }
 
   try {
-    const success = await addWeeklyProduct({
-      productId,
-      title,
-      description,
-      imageUrl,
-      price: parseFloat(price),
-      printifyProductId,
-      tags: tags || []
-    });
+    const success = await addWeeklyProduct(printifyId);
 
     if (success) {
       const response: ApiResponse<{ message: string }> = {
@@ -59,23 +43,25 @@ export const addProductToWeekly = asyncHandler(async (req: Request, res: Respons
   }
 });
 
-// Obtener productos de la semana actual
+// Obtener productos de la semana actual (devuelve datos completos desde la colección Product)
 export const getWeeklyProducts = asyncHandler(async (req: Request, res: Response) => {
   try {
     const { week } = req.query;
-    
-    // Si no se especifica semana, usar la actual
     const currentWeek = week || getCurrentWeekYear();
-    
-    const products = await WeeklyProduct.find({ weekYear: currentWeek })
+
+    const weeklyRefs = await WeeklyProduct.find({ weekYear: currentWeek })
       .sort({ publishedAt: -1 })
       .lean();
 
-    const response: ApiResponse<typeof products> = {
+    const products = await Promise.all(
+      weeklyRefs.map(ref => db.getProductByPrintifyId(ref.printifyId))
+    );
+
+    const response: ApiResponse<IProduct[]> = {
       success: true,
-      data: products
+      data: products.filter((p): p is IProduct => p !== null)
     };
-    
+
     return res.status(200).json(response);
   } catch (error: any) {
     console.error('Error obteniendo productos semanales:', error);
