@@ -129,6 +129,7 @@ class StripeService {
         cancel_url: cancelUrl,
         metadata,
         client_reference_id: clientReferenceId,
+        customer_creation: 'always', // Fuerza la creación de un Customer real (cus_) en lugar de Guest Customer (gcus_)
         shipping_address_collection: {
           allowed_countries: shippingOption.allowed_countries
         },
@@ -226,5 +227,9 @@ export default {
       stripeServiceInstance = new StripeService();
     }
     return stripeServiceInstance;
+  },
+  // Acceso directo a la instancia de Stripe para operaciones internas
+  getStripeInstance(): Stripe {
+    return this.getInstance()['stripe'];
   }
 };

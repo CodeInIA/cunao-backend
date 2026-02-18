@@ -20,6 +20,42 @@ function slugify(text: string): string {
     return text.toString().toLowerCase().replace(/ñ/g, 'n').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Resuelve el método de pago real usado en una Checkout Session.
+ * session.payment_method_types[0] siempre devuelve 'card', incluso si el cliente
+ * pagó con Google Pay o Apple Pay. Para detectarlo correctamente hay que expandir
+ * el payment_intent y leer card.wallet.type del PaymentMethod asociado.
+ */
+async function resolvePaymentMethod(session: Stripe.Checkout.Session): Promise<string> {
+  try {
+    const stripe = stripeServiceModule.getStripeInstance();
+    const paymentIntentId = typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : session.payment_intent?.id;
+
+    if (!paymentIntentId) {
+      return session.payment_method_types?.[0] || 'card';
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['payment_method']
+    });
+
+    const pm = paymentIntent.payment_method as Stripe.PaymentMethod | null;
+    if (!pm) return session.payment_method_types?.[0] || 'card';
+
+    // Detectar wallet (Google Pay, Apple Pay, Link, etc.)
+    if (pm.type === 'card' && pm.card?.wallet?.type) {
+      return pm.card.wallet.type; // 'google_pay' | 'apple_pay' | 'link' | etc.
+    }
+
+    return pm.type || session.payment_method_types?.[0] || 'card';
+  } catch (e) {
+    console.warn('No se pudo resolver el método de pago real:', e);
+    return session.payment_method_types?.[0] || 'card';
+  }
+}
+
 // --- Validación de Firma de Printify ---
 function validatePrintifySignature(req: Request): boolean {
   const signature = req.headers['x-pfy-signature'] as string;
@@ -142,12 +178,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   }
   
+  // Resolver el método de pago real una sola vez (se reutiliza abajo para el cliente)
+  const resolvedPaymentMethod = await resolvePaymentMethod(session);
+
   const updatedOrder = await db.updateOrderByOrderId(orderId, {
     stripeSessionId: session.id,
     customerEmail: session.customer_details?.email ?? undefined,
     customerName: session.customer_details?.name ?? undefined,
     totalAmount: (session.amount_total ?? 0) / 100,
     shippingCost: shippingCost,
+    paymentMethod: resolvedPaymentMethod,
     discountCode: discountCode,
     discountPercentage: discountPercentage,
     discountAppliesTo: discountAppliesTo,
@@ -214,7 +254,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Guardar o actualizar datos del cliente
   try {
     const customerEmail = session.customer_details?.email;
-    const customerName = session.collected_information?.shipping_details?.name ?? session.customer_details?.name;
+    // Nombre de facturación (customer_details), no el de envío
+    const customerName = session.customer_details?.name ?? session.collected_information?.shipping_details?.name;
     const shippingAddress = session.collected_information?.shipping_details?.address;
     const phone = session.customer_details?.phone;
     
@@ -257,7 +298,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       // Actualizar información de pago
       const customerId = typeof session.customer === 'string' ? session.customer : undefined;
       existingClient.paymentInfo.stripeCustomerId = customerId ?? existingClient.paymentInfo.stripeCustomerId;
-      existingClient.paymentInfo.lastPaymentMethod = session.payment_method_types?.[0] ?? existingClient.paymentInfo.lastPaymentMethod;
+      existingClient.paymentInfo.lastPaymentMethod = resolvedPaymentMethod ?? existingClient.paymentInfo.lastPaymentMethod;
       
       // Actualizar dirección de envío y teléfono con los datos más recientes
       if (shippingAddress) {
@@ -314,7 +355,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         },
         paymentInfo: {
           stripeCustomerId: session.customer || '',
-          lastPaymentMethod: session.payment_method_types?.[0] || ''
+          lastPaymentMethod: resolvedPaymentMethod || ''
         },
         orderIds: [orderId],
         emailMarketing: emailMarketing,

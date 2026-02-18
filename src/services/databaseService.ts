@@ -157,6 +157,7 @@ interface IOrder extends Document {
   };
   totalAmount: number;
   shippingCost?: number;
+  paymentMethod?: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   trackingUrl?: string;
@@ -201,6 +202,7 @@ const OrderSchema: Schema = new Schema({
   },
   totalAmount: { type: Number, required: true },
   shippingCost: { type: Number, default: 0 },
+  paymentMethod: { type: String },
   status: { type: String, default: 'pending' },
   trackingNumber: String,
   trackingUrl: String,
