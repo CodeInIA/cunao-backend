@@ -13,7 +13,7 @@
     "cancel-orders": "tsx src/cron/cancelAllPrintifyOrders.ts",
     "cleanup-orders": "tsx src/cron/cleanupExpiredOrders.ts",
     "create-discount": "tsx src/cron/createDiscountCode.ts",
-    "migrate-images": "tsx src/scripts/migrateImages.ts"
+    "test-email:delivery": "tsx scripts/testDeliveryEmail.ts"
   },
   "dependencies": {
     "@types/node-cron": "^3.0.11",
