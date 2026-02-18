@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { PaymentMethodInfo } from '../types';
 
 export interface IClient extends Document {
   name: string;
@@ -14,7 +15,7 @@ export interface IClient extends Document {
   };
   paymentInfo: {
     stripeCustomerId?: string;
-    lastPaymentMethod?: string;
+    lastPaymentMethod?: PaymentMethodInfo;
   };
   orderIds: string[];
   emailMarketing: boolean;
@@ -50,7 +51,10 @@ const ClientSchema: Schema = new Schema({
   },
   paymentInfo: {
     stripeCustomerId: { type: String },
-    lastPaymentMethod: { type: String }
+    lastPaymentMethod: {
+      provider: { type: String },
+      cardBrand: { type: String }
+    }
   },
   orderIds: [{
     type: String,

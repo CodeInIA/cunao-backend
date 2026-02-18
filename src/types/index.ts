@@ -166,3 +166,8 @@ export interface PaginatedResponse<T> {
     total: number;
   };
 }
+
+export interface PaymentMethodInfo {
+  provider: string;      // 'visa' | 'mastercard' | 'google_pay' | 'apple_pay' | 'paypal' | 'klarna' | 'amazon_pay' | 'link' | 'card' | …
+  cardBrand?: string;    // 'visa' | 'mastercard' | 'amex' | … (solo cuando provider es wallet)
+}

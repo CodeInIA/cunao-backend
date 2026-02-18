@@ -8,7 +8,7 @@ import printifyServiceModule from '../services/printifyService.js';
 import imageServiceModule from '../services/imageService.js';
 import * as notificationService from '../services/notificationService.js';
 import { db } from '../services/databaseService.js';
-import { PrintifyProduct } from '../types/index.js';
+import { PrintifyProduct, PaymentMethodInfo } from '../types/index.js';
 import Client from '../models/Client.js';
 import Newsletter from '../models/Newsletter.js';
 import WeeklyProduct from '../models/WeeklyProducts.js';
@@ -25,8 +25,9 @@ function slugify(text: string): string {
  * session.payment_method_types[0] siempre devuelve 'card', incluso si el cliente
  * pagó con Google Pay o Apple Pay. Para detectarlo correctamente hay que expandir
  * el payment_intent y leer card.wallet.type del PaymentMethod asociado.
+ * Devuelve un objeto { provider, cardBrand? } para capturar ambos niveles.
  */
-async function resolvePaymentMethod(session: Stripe.Checkout.Session): Promise<string> {
+async function resolvePaymentMethod(session: Stripe.Checkout.Session): Promise<PaymentMethodInfo> {
   try {
     const stripe = stripeServiceModule.getStripeInstance();
     const paymentIntentId = typeof session.payment_intent === 'string'
@@ -34,7 +35,7 @@ async function resolvePaymentMethod(session: Stripe.Checkout.Session): Promise<s
       : session.payment_intent?.id;
 
     if (!paymentIntentId) {
-      return session.payment_method_types?.[0] || 'card';
+      return { provider: session.payment_method_types?.[0] || 'card' };
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
@@ -42,17 +43,24 @@ async function resolvePaymentMethod(session: Stripe.Checkout.Session): Promise<s
     });
 
     const pm = paymentIntent.payment_method as Stripe.PaymentMethod | null;
-    if (!pm) return session.payment_method_types?.[0] || 'card';
+    if (!pm) return { provider: session.payment_method_types?.[0] || 'card' };
 
-    // Detectar wallet (Google Pay, Apple Pay, Link, etc.)
+    // Wallet (Google Pay, Apple Pay, Link, etc.) — también capturamos la marca de la tarjeta subyacente
     if (pm.type === 'card' && pm.card?.wallet?.type) {
-      return pm.card.wallet.type; // 'google_pay' | 'apple_pay' | 'link' | etc.
+      const result: PaymentMethodInfo = { provider: pm.card.wallet.type };
+      if (pm.card?.brand) result.cardBrand = pm.card.brand;
+      return result;
     }
 
-    return pm.type || session.payment_method_types?.[0] || 'card';
+    // Tarjeta sin wallet — la marca es el identificador principal
+    if (pm.type === 'card' && pm.card?.brand) {
+      return { provider: pm.card.brand };
+    }
+
+    return { provider: pm.type || session.payment_method_types?.[0] || 'card' };
   } catch (e) {
     console.warn('No se pudo resolver el método de pago real:', e);
-    return session.payment_method_types?.[0] || 'card';
+    return { provider: session.payment_method_types?.[0] || 'card' };
   }
 }
 
@@ -202,7 +210,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       country: session.collected_information?.shipping_details?.address?.country ?? '',
       phone: session.customer_details?.phone ?? '',
     },
-    status: 'pending'
+    status: 'processing'
   });
 
   if (!updatedOrder) {
@@ -355,7 +363,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         },
         paymentInfo: {
           stripeCustomerId: session.customer || '',
-          lastPaymentMethod: resolvedPaymentMethod || ''
+          lastPaymentMethod: resolvedPaymentMethod
         },
         orderIds: [orderId],
         emailMarketing: emailMarketing,
