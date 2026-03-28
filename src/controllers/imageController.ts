@@ -10,7 +10,7 @@ import imageServiceModule from '../services/imageService.js';
 
 // Regenerar imágenes de un producto específico
 export const regenerateProductImages = asyncHandler(async (req: Request, res: Response) => {
-  const { productId } = req.params;
+  const productId = req.params.productId as string;
 
   if (!productId) {
     return res.status(400).json({ error: 'Se requiere el ID del producto' });

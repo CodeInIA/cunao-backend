@@ -455,7 +455,7 @@ export async function listProductsAdmin(req: Request, res: Response) {
 // Actualizar tags de producto: llama a Printify y si OK actualiza MongoDB
 export async function updateProductTagsAdmin(req: Request, res: Response) {
   try {
-    const id = req.params.id; // printify product id
+    const id = req.params.id as string; // printify product id
     const tags = req.body && Array.isArray(req.body.tags) ? req.body.tags.map(String) : null;
     if (!tags) return res.status(400).json({ error: 'tags array required' });
 

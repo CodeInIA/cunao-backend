@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { PaymentMethodInfo } from '../types';
+import { PaymentMethodInfo } from '../types/index.js';
 
 export interface IClient extends Document {
   name: string;

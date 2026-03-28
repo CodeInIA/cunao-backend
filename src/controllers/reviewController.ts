@@ -127,7 +127,7 @@ const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024;
 const MIN_REVIEW_CHARS = 20;
 
 export async function validateToken(req: Request, res: Response) {
-  const { token } = req.params;
+  const token = req.params.token as string;
   if (!token) return res.status(400).json({ error: 'Token requerido' });
   const order = await db.findOrderByReviewToken(token);
   if (!order) return res.status(404).json({ valid: false });
@@ -157,7 +157,7 @@ export async function submitReview(req: Request, res: Response) {
       return res.status(500).json({ error: 'Cloudinary configuration error', detail: String(cfgErr && (cfgErr as any).message ? (cfgErr as any).message : cfgErr) });
     }
 
-    const token = req.params.token;
+    const token = req.params.token as string;
     if (!token) return res.status(400).json({ error: 'Token requerido' });
 
     // Buscar orden por token
@@ -399,7 +399,7 @@ export async function publishReview(req: Request, res: Response) {
 export async function generateTokenForOrder(req: Request, res: Response) {
   try {
     if (!checkAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
-    const orderId = req.params.orderId;
+    const orderId = req.params.orderId as string;
     if (!orderId) return res.status(400).json({ error: 'orderId requerido' });
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);

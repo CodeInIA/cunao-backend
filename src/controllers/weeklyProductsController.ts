@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ApiResponse } from '../types';
+import { ApiResponse } from '../types/index.js';
 import { addWeeklyProduct, sendNewProductsEmailManual } from '../cron/weeklyNewProducts.js';
 import WeeklyProduct from '../models/WeeklyProducts.js';
 import { db, IProduct } from '../services/databaseService.js';

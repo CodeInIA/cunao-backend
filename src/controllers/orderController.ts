@@ -487,8 +487,8 @@ export const processOrder = asyncHandler(async (req: Request, res: Response) => 
 // NOTA DE SEGURIDAD: Este endpoint expone información del pedido sin autenticación.
 // En producción, considerar añadir autenticación o al menos ofuscar IDs sensibles.
 export const getOrderStatus = asyncHandler(async (req: Request, res: Response) => {
-  const { orderId } = req.params;
-  
+  const orderId = req.params.orderId as string;
+
   const printifyService = printifyServiceModule.getInstance();
   const order = await printifyService.getOrder(orderId);
   

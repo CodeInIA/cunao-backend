@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { ApiResponse } from '../types';
+import { ApiResponse } from '../types/index.js';
 import * as crypto from 'crypto';
 import * as mongoose from 'mongoose';
 import Newsletter from '../models/Newsletter.js';

@@ -100,7 +100,7 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
 
 // Obtener un producto específico por SLUG o ID
 export const getProduct = asyncHandler(async (req: Request, res: Response) => {
-  const { id: identifier } = req.params;
+  const identifier = req.params.id as string;
   
   try {
     // Buscar en MongoDB primero
@@ -147,7 +147,7 @@ export const getProduct = asyncHandler(async (req: Request, res: Response) => {
 
 // Obtener variantes de un producto por SLUG o ID
 export const getProductVariants = asyncHandler(async (req: Request, res: Response) => {
-  const { id: identifier } = req.params;
+  const identifier = req.params.id as string;
   
   try {
     // Buscar en MongoDB primero
@@ -190,7 +190,7 @@ export const getProductVariants = asyncHandler(async (req: Request, res: Respons
 
 // Obtener información GPSR de un producto por SLUG o ID
 export const getProductGPSR = asyncHandler(async (req: Request, res: Response) => {
-  const { id: identifier } = req.params;
+  const identifier = req.params.id as string;
   
   try {
     const dbProduct = await findProductByIdentifier(identifier);

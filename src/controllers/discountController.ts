@@ -109,7 +109,7 @@ export const validateDiscountCode = asyncHandler(async (req: Request, res: Respo
 
 // Obtener código de descuento por código (para uso interno)
 export const getDiscountCode = asyncHandler(async (req: Request, res: Response) => {
-  const { code } = req.params;
+  const code = req.params.code as string;
   
   try {
     const discountCode = await DiscountCode.findValidCode(code);

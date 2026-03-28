@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import Newsletter from '../models/Newsletter.js';
-import { ApiResponse } from '../types';
+import { ApiResponse } from '../types/index.js';
 import { sendNewsletterManual, addNewsletterSubscriberToDB } from '../cron/weeklyNewsletter.js';
 
 interface NewsletterSubscriptionData {
