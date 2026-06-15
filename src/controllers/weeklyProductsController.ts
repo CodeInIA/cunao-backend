@@ -47,7 +47,7 @@ export const addProductToWeekly = asyncHandler(async (req: Request, res: Respons
 export const getWeeklyProducts = asyncHandler(async (req: Request, res: Response) => {
   try {
     const { week } = req.query;
-    const currentWeek = week || getCurrentWeekYear();
+    const currentWeek = (week as string) || getCurrentWeekYear();
 
     const weeklyRefs = await WeeklyProduct.find({ weekYear: currentWeek })
       .sort({ publishedAt: -1 })
