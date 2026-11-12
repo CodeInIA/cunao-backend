@@ -1,7 +1,10 @@
 {
   "name": "cunao-backend",
   "version": "1.0.0",
-  "description": "Backend para la tienda Cuñadismo Ilustrado",
+  "description": "REST API for Cuñadismo Ilustrado, a print-on-demand t-shirt shop (Express, TypeScript, MongoDB, Stripe, Printify)",
+  "author": "Sergio Barrios Paz (https://github.com/CodeInIA)",
+  "license": "SEE LICENSE IN LICENSE",
+  "private": true,
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -12,8 +15,7 @@
     "heroku-postbuild": "npm run build",
     "cancel-orders": "tsx src/cron/cancelAllPrintifyOrders.ts",
     "cleanup-orders": "tsx src/cron/cleanupExpiredOrders.ts",
-    "create-discount": "tsx src/cron/createDiscountCode.ts",
-    "test-email:delivery": "tsx scripts/testDeliveryEmail.ts"
+    "create-discount": "tsx src/cron/createDiscountCode.ts"
   },
   "dependencies": {
     "@types/node-cron": "^3.0.11",
