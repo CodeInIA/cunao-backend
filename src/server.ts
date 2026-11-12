@@ -127,6 +127,12 @@ app.listen(PORT, () => {
     }
   }
   
+  // Set DISABLE_CRON=true to run the API without scheduled jobs (local demos, screenshots)
+  if (process.env.DISABLE_CRON === 'true') {
+    console.log('Scheduled jobs disabled (DISABLE_CRON=true)');
+    return;
+  }
+
   // Inicializar scheduler de newsletter
   startNewsletterScheduler();
   
